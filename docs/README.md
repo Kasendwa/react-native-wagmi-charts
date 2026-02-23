@@ -30,13 +30,27 @@ A sweet & simple chart library for React Native that will make us feel like **W*
 ## Install
 
 ```bash
-npm install react-native-wagmi-charts
+# npm
+npm install react-native-wagmi-charts@3.0.0-beta.1
+
+# yarn
+yarn add react-native-wagmi-charts@3.0.0-beta.1
+
+# pnpm
+pnpm add react-native-wagmi-charts@3.0.0-beta.1
 ```
 
 WAGMI charts depends on a few peer libraries. Install these if you don't already have them:
 
 ```bash
+# npm
 npm install @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
+
+# yarn
+yarn add @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
+
+# pnpm
+pnpm add @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
 ```
 
 > **Note:** v3 uses `@shopify/react-native-skia` for rendering instead of `react-native-svg`. If you are upgrading from v2, see the [Migration Guide](./migration-v2-to-v3.md).

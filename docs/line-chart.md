@@ -472,9 +472,12 @@ const multiData = {
 | `color` | `string` | `"black"` | Line color |
 | `width` | `number` | `3` | Line stroke width |
 | `inactiveColor` | `string` | | Color when chart is inactive |
-| `isTransitionEnabled` | `boolean` | `true` | Animate path changes between datasets |
+| `pathProps` | `Partial<LineChartPathProps>` | | Props passed to the inner Skia path (includes `isTransitionEnabled`) |
 | `animationDuration` | `number` | `300` | Transition animation duration (ms) |
 | `animateOnMount` | `"foreground"` | | Animate the path drawing on mount |
+| `mountAnimationDuration` | `number` | | Duration of the mount animation (ms) |
+| `showInactivePath` | `boolean` | | Show the inactive (background) path |
+| `widthOffset` | `number` | | Pixel offset for the foreground clip width |
 
 ### LineChart.CursorCrosshair
 
@@ -501,10 +504,14 @@ const multiData = {
 | `strokeWidth` | `number` | `2` | Line stroke width |
 | `dashWidth` | `number` | `3` | Dash segment width |
 | `dashGap` | `number` | `3` | Gap between dashes |
-| `format` | `TFormatterFn` | | Label format function |
+| `format` | `TFormatterFn<string \| number>` | | Label format function |
 | `textStyle` | `TextStyle` | | Label text style |
-| `orientation` | `"horizontal" \| "vertical"` | `"vertical"` | Line orientation |
 | `persistOnEnd` | `boolean` | `false` | Keep cursor visible after gesture ends |
+| `snapToPoint` | `boolean` | `false` | Snap to nearest data point (native only) |
+| `at` | `number` | | Programmatically set cursor to data index |
+| `minDurationMs` | `number` | `0` | Minimum long-press duration before activation |
+| `onActivated` | `() => void` | | Called when cursor activates |
+| `onEnded` | `() => void` | | Called when cursor deactivates |
 
 ### LineChart.Tooltip
 
@@ -527,6 +534,8 @@ const multiData = {
 | `precision` | `number` | `2` | Decimal places |
 | `variant` | `"formatted" \| "value"` | `"formatted"` | Display variant |
 | `index` | `number` | | Show price for a specific data index |
+| `useOptimizedRendering` | `boolean` | `false` | Use React state instead of AnimatedText (requires `format`) |
+| `getTextColor` | `(formattedValue: string) => string` | | Dynamic text color based on value (requires `useOptimizedRendering`) |
 | `style` | `StyleProp<TextStyle>` | | Text style |
 
 ### LineChart.DatetimeText
@@ -590,16 +599,18 @@ const multiData = {
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `position` | `"left" \| "right" \| "top" \| "bottom"` | | Axis position |
-| `orientation` | `"vertical" \| "horizontal"` | | Axis orientation |
+| `position` | `"left" \| "right" \| "top" \| "bottom"` | *required* | Axis position |
+| `orientation` | `"vertical" \| "horizontal"` | *required* | Axis orientation |
 | `color` | `string` | `"#666"` | Line and tick color |
 | `strokeWidth` | `number` | | Line stroke width |
 | `tickCount` | `number` | `5` | Number of ticks |
 | `domain` | `[number, number]` | `[0, 100]` | Axis domain |
 | `hideOnInteraction` | `boolean` | `false` | Hide during cursor interaction |
-| `format` | `(value: number) => string` | | Tick label formatter |
-| `textStyle` | `StyleProp<TextStyle>` | | Tick label style |
-| `labelPadding` | `number` | | Padding between labels and axis |
+| `format` | `(value: number \| string) => string \| number` | | Tick label formatter |
+| `textStyle` | `TextStyle` | | Tick label style |
+| `labelPadding` | `number` | `3` | Padding between labels and axis |
+| `labelWidth` | `number` | | Width allocated for labels |
+| `containerStyle` | `ViewStyle` | | Custom container style |
 
 ### LineChart.HoverTrap
 

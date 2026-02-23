@@ -21,12 +21,17 @@ v3 replaces `react-native-svg` with `@shopify/react-native-skia` for rendering. 
 ## New Dependencies
 
 ```bash
-# Install new dependencies
-npm install @shopify/react-native-skia react-native-worklets
+# npm
+npm install react-native-wagmi-charts@3.0.0-beta.1 @shopify/react-native-skia react-native-worklets
 
-# react-native-svg is no longer required by this library
-# (you can keep it if other parts of your app use it)
+# yarn
+yarn add react-native-wagmi-charts@3.0.0-beta.1 @shopify/react-native-skia react-native-worklets
+
+# pnpm
+pnpm add react-native-wagmi-charts@3.0.0-beta.1 @shopify/react-native-skia react-native-worklets
 ```
+
+> `react-native-svg` is no longer required by this library. You can keep it if other parts of your app use it.
 
 Update your `babel.config.js` if needed — `react-native-reanimated/plugin` should already be configured from v2.
 

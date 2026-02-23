@@ -92,14 +92,27 @@ To get started with using WAGMI charts in your React Native project, install the
 `react-native-wagmi-charts` package.
 
 ```bash
-npm install react-native-wagmi-charts
+# npm
+npm install react-native-wagmi-charts@3.0.0-beta.1
+
+# yarn
+yarn add react-native-wagmi-charts@3.0.0-beta.1
+
+# pnpm
+pnpm add react-native-wagmi-charts@3.0.0-beta.1
 ```
 
-WAGMI charts also depends on a few libraries, you will also need to install
-these packages if you don't already have them:
+WAGMI charts also depends on a few peer libraries. Install these if you don't already have them:
 
 ```bash
+# npm
 npm install @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
+
+# yarn
+yarn add @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
+
+# pnpm
+pnpm add @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
 ```
 
 > **Note:** v3 uses `@shopify/react-native-skia` for rendering instead of `react-native-svg`. If you are upgrading from v2, see the [Migration Guide](#migrating-from-v2-to-v3) below.
@@ -762,7 +775,7 @@ To render an interactive label on your candlestick chart, you can use the
   <CandlestickChart.PriceText type="low" />
   <CandlestickChart.PriceText type="close" />
   <CandlestickChart.DatetimeText />
-</LineChart.Provider>
+</CandlestickChart.Provider>
 ```
 
 <img src="https://user-images.githubusercontent.com/7336481/133034935-faea61e6-09c2-4dba-a1ab-555d1ebee880.gif" width="200px" />
@@ -936,9 +949,11 @@ function in the form of a
 
 | Prop      | Type                                          | Default | Description                                                                                                                                                                                                                                                            |
 | --------- | --------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data`    | `Array<{ timestamp: number, value: number }>` |         | The line chart data as an array of timestamps & values (prices).                                                                                                                                                                                                       |
+| `data`    | `TLineChartDataProp` |         | Array of `{ timestamp, value }` or dictionary of named arrays for multi-line. |
 | `yRange`  | `{ min?: number; max?: number }`              |         | Set a custom range for the y values of your chart. See [#20](https://github.com/coinjar/react-native-wagmi-charts/issues/20) for a use-case.                                                                                                                           |
-| `xDomain` | `[ min: number; max: number ]`                |         | Scale x values proportionate to their time scale. Distance between points will be relative to each other instead of same spacing between in point. See [#140](https://github.com/coinjar/react-native-wagmi-charts/issues/140#issuecomment-1614264020) for a use-case. |
+| `xDomain` | `[number, number]`                |         | Scale x values proportionate to their time scale. Distance between points will be relative to each other instead of same spacing between in point. See [#140](https://github.com/coinjar/react-native-wagmi-charts/issues/140#issuecomment-1614264020) for a use-case. |
+| `xLength` | `number` | `data.length` | Total x-axis length (use for partial-day charts). |
+| `onCurrentIndexChange` | `(index: number) => void` | | Callback when the active data index changes. |
 
 ### LineChart
 
@@ -957,7 +972,9 @@ function in the form of a
 | `color`                | `string`  | `"black"` | Color of the line path                               |
 | `width`                | `number`  | `3`       | Width of the line path                               |
 | `inactiveColor`        | `string`  |           | Color of the path when the chart is inactive         |
-| `isTransitionEnabled`  | `boolean` | `true`    | Whether path changes should animate                  |
+| `pathProps`            | `Partial<LineChartPathProps>` |  | Props for the inner Skia path (includes `isTransitionEnabled`) |
+| `animationDuration`    | `number`  | `300`     | Transition animation duration (ms)                   |
+| `animateOnMount`       | `"foreground"` |        | Animate the path drawing on mount                    |
 
 ### LineChart.CursorCrosshair
 

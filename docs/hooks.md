@@ -206,11 +206,15 @@ function CandleInfo() {
 
 ### CandlestickChart.useCandleData
 
-Returns the current candle under the crosshair as a shared value. This is the same `candle` from `useChart`, but as a standalone hook for convenience.
+Returns the current candle under the crosshair as a `SharedValue<TCandle>`. This is the same `candle` from `useChart`, but as a standalone hook for convenience.
 
 ```jsx
 const candle = CandlestickChart.useCandleData();
-// candle.value = { timestamp, open, high, low, close }
+// candle is a SharedValue — access fields via candle.value.open, candle.value.close, etc.
+// Use in worklets or useDerivedValue/useAnimatedStyle:
+const style = useAnimatedStyle(() => ({
+  opacity: candle.value.close === -1 ? 0 : 1,
+}));
 ```
 
 The candle shared value only updates when the crosshair crosses a candle boundary — not on every gesture frame. This makes it efficient for building custom displays.
