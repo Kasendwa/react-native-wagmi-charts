@@ -167,7 +167,7 @@ The SVG `...props` spread (`AnimatedProps<PathProps>`) is no longer accepted. On
 />
 ```
 
-Supported props: `color`, `inactiveColor`, `width`, `isTransitionEnabled`.
+Supported props: `color`, `inactiveColor`, `width`, `pathProps` (includes `isTransitionEnabled`), `animationDuration`, `animateOnMount`.
 
 ---
 

@@ -8,12 +8,10 @@ This document explains why we rebuilt react-native-wagmi-charts on Skia, what pr
 
 - [Why the Switch to Skia?](#why-the-switch-to-skia)
 - [Problems in v2](#problems-in-v2)
-  - [SVG Rendering Bottleneck](#svg-rendering-bottleneck)
+  - [SVG Rendering Overhead](#svg-rendering-overhead)
   - [Per-Candle Component Overhead](#per-candle-component-overhead)
-  - [Excessive Worklet Execution](#excessive-worklet-execution)
+  - [Unguarded Shared Value Writes](#unguarded-shared-value-writes)
   - [Redundant Computations](#redundant-computations)
-  - [Multiple Native Surfaces](#multiple-native-surfaces)
-  - [Unnecessary JS Thread Bouncing](#unnecessary-js-thread-bouncing)
 - [What v3 Solves](#what-v3-solves)
   - [Skia: GPU-Accelerated Rendering](#skia-gpu-accelerated-rendering)
   - [Single-Pass Geometry Computation](#single-pass-geometry-computation)
@@ -28,71 +26,68 @@ This document explains why we rebuilt react-native-wagmi-charts on Skia, what pr
 
 ## Why the Switch to Skia?
 
-v2 used `react-native-svg` for all chart rendering. While SVG is familiar and works well for static graphics, it has fundamental limitations for interactive, high-frequency chart updates:
+v2 used `react-native-svg` for all chart rendering. While SVG is familiar and works well for static graphics, it has limitations for interactive charts:
 
-- **SVG is DOM-based** — every element is a native view in the hierarchy, and updates go through React reconciliation + native view mutation
-- **No shared value integration** — SVG elements can't read Reanimated `SharedValue` props directly, requiring animated wrappers
-- **Heavy for large datasets** — 100+ candles means 200+ native SVG elements, each with its own layout and drawing overhead
+- **SVG elements are native views** — each `<Rect>` and `<Line>` is a real native view in the hierarchy, with layout and compositing overhead
+- **No direct SharedValue integration** — SVG elements can't read Reanimated `SharedValue` props natively; v2 used `Animated.createAnimatedComponent(Rect)` and `useAnimatedProps` to bridge this gap
+- **Heavy for large datasets** — 100 candles means 200 native SVG views (1 Rect + 1 Line per candle), each registered in the native view hierarchy
 
-Skia, by contrast, is a **GPU-accelerated 2D graphics engine** (the same one Chrome and Android use). It draws directly to a GPU texture, bypassing the native view hierarchy entirely.
+Skia, by contrast, is a **GPU-accelerated 2D graphics engine** (the same one Chrome and Android use). `@shopify/react-native-skia` renders into a single GPU texture via its own React reconciler, bypassing the native view hierarchy.
+
+**If your app already uses `@shopify/react-native-skia`** (e.g. for other Skia-based libraries), v3 lets you drop `react-native-svg` as a dependency entirely — one fewer native module to install, link, and maintain.
 
 ---
 
 ## Problems in v2
 
-### SVG Rendering Bottleneck
+### SVG Rendering Overhead
 
-Every candlestick was rendered as individual SVG `<Rect>` and `<Line>` elements. With 100 candles, that's 200+ native views in the hierarchy. Each view update during gesture interaction required:
+Every candlestick was rendered as individual SVG `<Rect>` and `<Line>` elements wrapped with `Animated.createAnimatedComponent()`. With 100 candles, that's:
 
-1. React reconciliation (diffing the component tree)
-2. Native view property updates (bridge calls)
-3. Layout recalculation
-4. Compositing by the OS
+- **200 native SVG views** in the hierarchy
+- **200 `useAnimatedProps` mappers** — one per `AnimatedRect` and one per `AnimatedLine`, used for `withTiming` data transition animations
+- **100 React component instances** in the fiber tree
 
-This created visible frame drops during gesture interaction, especially on Android.
+While these `useAnimatedProps` mappers were primarily for data transitions (not gesture interaction), they still represent registered overhead in Reanimated's mapper system.
 
 ### Per-Candle Component Overhead
 
-Each candle was a separate React component with its own hooks (`useDerivedValue`, `useAnimatedStyle`). For 100 candles:
+In v2, each candle was its own `CandlestickChartCandle` React component:
 
-- **100 component instances** in React's fiber tree
-- **200+ Reanimated mappers** (one per `useDerivedValue`/`useAnimatedStyle`)
-- **100 hook registrations** inside the reconciler
-
-Even though most candles don't change during interaction, the React reconciler still had to visit each component to determine if it needed updating.
-
-### Excessive Worklet Execution
-
-A critical discovery during the v3 optimization work: **Reanimated's `SharedValue._value` setter does not perform an equality check before notifying listeners.** This means:
-
-```js
-// This fires ALL dependent mappers, even if currentX hasn't changed
-currentX.value = sameValueAsBeforeX;
+```jsx
+// v2: Each candle is a separate component with 2 useAnimatedProps hooks
+{data.map((candle, index) => (
+  <CandlestickChartCandle
+    key={index}
+    candle={candle}
+    domain={domain}
+    maxHeight={height}
+    width={step}
+    index={index}
+  />
+))}
 ```
 
-In v2, gesture handlers wrote to shared values on every touch move event (~60 times/sec) without checking if the value actually changed. This triggered cascading mapper execution across all dependent `useDerivedValue`, `useAnimatedStyle`, and `useAnimatedProps` hooks — even when the computed output was identical.
+Each component called `useAnimatedProps` twice (for rect and line) and `React.useMemo` twice. Even though candles are static during gesture interaction, React's reconciler still visits each component during re-renders to determine if updates are needed.
+
+### Unguarded Shared Value Writes
+
+A critical discovery during the v3 optimization work: **Reanimated's `SharedValue._value` setter does not perform an equality check before notifying listeners.** Every `sv.value = x` triggers all dependent mappers, even if `x === sv.value`.
+
+In v2, the crosshair gesture handler wrote to shared values on every touch move without equality guards:
+
+```js
+// v2 Crosshair.tsx — updatePosition called on every onTouchesMove
+currentY.value = clamp(y, 0, height);
+currentX.value = boundedX - (boundedX % step) + step / 2;
+currentIndex.value = Math.floor(boundedX / step);
+```
+
+When the finger moves within the same candle, `currentX` and `currentIndex` don't actually change — but the writes still fire all downstream mappers (`useAnimatedStyle` for crosshair position, `useAnimatedReaction` for callbacks, etc.).
 
 ### Redundant Computations
 
-Multiple `PriceText` components each independently computed the same values:
-
-- Each crosshair `PriceText` ran its own `getPrice()` interpolation from the Y position
-- Each OHLC `PriceText` independently looked up `data[currentIndex]` to get the candle
-- Each `DatetimeText` independently looked up the timestamp
-
-With the full example app showing 13 `PriceText` + 3 `DatetimeText` components, this meant 16 independent computations of overlapping data on every gesture frame.
-
-### Multiple Native Surfaces
-
-v2's architecture used separate `Canvas`/`View` instances for different chart layers (background path, foreground path, crosshair lines, cursor dot, tooltip). Each native surface requires:
-
-- Its own GPU texture allocation
-- OS-level compositing to blend them together
-- Synchronization overhead between surfaces
-
-### Unnecessary JS Thread Bouncing
-
-The `onCurrentXChange` callback fired on every pixel of cursor movement, using `scheduleOnRN` to bounce to the JS thread ~60 times/sec. This was typically used for haptic feedback, which only needs to fire when crossing a data point boundary — not on every pixel.
+In v2, each `PriceText` and `DatetimeText` component independently computed its values from the raw shared values. There was no shared intermediate computation — each consumer did its own lookup into the data array.
 
 ---
 
@@ -102,8 +97,7 @@ The `onCurrentXChange` callback fired on every pixel of cursor movement, using `
 
 All chart rendering now uses `@shopify/react-native-skia`:
 
-- **Single Canvas** — all candles render into one GPU texture, not 200+ native views
-- **Picture recording** — Skia records drawing commands once and replays them. Static content (candles) is recorded once and never re-recorded during interaction
+- **Single Canvas** — all candles render into one GPU texture, not 200 native views
 - **SharedValue props** — Skia detects `SharedValue` objects passed as props and reads their `.value` at draw time on the UI thread, enabling smooth animations without React reconciliation
 - **`opaque` Canvas** — skips alpha compositing for the candlestick canvas, reducing GPU work
 
@@ -136,7 +130,7 @@ This replaces 100 per-candle components with a single array of plain objects. Th
 Common computations are done once and shared via context:
 
 - **`candle` shared value** — the OHLC data of the candle under the crosshair is computed once in the `Provider` using `useDerivedValue`. All `PriceText` and `DatetimeText` consumers read from this single shared value instead of each computing independently.
-- **`currentIndex`-based updates** — the shared candle depends on `currentIndex` (which only changes when crossing a candle boundary), not `currentX` (which changes every pixel). This means OHLC lookups only fire ~10 times during a swipe, not ~60 times/sec.
+- **`currentIndex`-based updates** — the shared candle depends on `currentIndex` (which only changes when crossing a candle boundary), not `currentX`. This means OHLC lookups only re-evaluate when the crosshair moves to a different candle.
 
 ### Equality-Guarded Writes
 
@@ -148,23 +142,22 @@ if (currentX.value !== newX) currentX.value = newX;
 if (currentIndex.value !== newIdx) currentIndex.value = newIdx;
 ```
 
-This prevents unnecessary mapper cascades when the user's finger moves within the same candle or data point.
+This prevents unnecessary mapper cascades when the user's finger moves within the same candle or data point — a common scenario since candles are wider than individual pixels.
 
 ### Reduced Mapper Count
 
-v3 significantly reduces the number of Reanimated mappers (the unit of per-frame work on the UI thread):
+v3 reduces the number of Reanimated mappers (the unit of per-frame work on the UI thread):
 
 | Optimization | Impact |
 |---|---|
-| Single tooltip instead of 2 (was left + right with opacity toggle) | -2 mappers |
-| Shared candle in context instead of per-consumer `useDerivedValue` | -(N-1) mappers |
-| Split crosshair/OHLC price hooks | OHLC mappers don't fire every frame |
+| Shared candle in context instead of per-consumer `useDerivedValue` | -(N-1) mappers (N = number of PriceText/DatetimeText) |
+| Split crosshair/OHLC price hooks | OHLC mappers don't fire every gesture frame |
 | Eliminated redundant `useDerivedValue` chain in line chart `useDatetime` | -1 mapper per DatetimeText |
-| Raw Skia elements instead of per-candle components | -200+ mappers for 100 candles |
+| Raw Skia elements instead of per-candle `useAnimatedProps` | Eliminates 200 mappers for 100 candles |
 
 ### Throttled Callbacks
 
-`onCurrentXChange` now fires only when the crosshair crosses a candle boundary (via `currentIndex` change), not on every pixel:
+In v2, `onCurrentXChange` tracked `currentX.value` via `useAnimatedReaction`. Since `currentX` is snapped to candle centers, it changed on each candle boundary crossing. In v3, the reaction tracks `currentIndex` instead, which is semantically clearer and avoids any edge cases where `currentX` might change without a real candle change:
 
 ```js
 useAnimatedReaction(
@@ -177,8 +170,6 @@ useAnimatedReaction(
 );
 ```
 
-This reduces JS thread bouncing from ~60 calls/sec to ~5-10 calls/sec during a typical swipe.
-
 ---
 
 ## Expected Benefits
@@ -187,23 +178,25 @@ This reduces JS thread bouncing from ~60 calls/sec to ~5-10 calls/sec during a t
 
 | Metric | v2 | v3 |
 |---|---|---|
-| UI FPS during gesture (chart only) | 30–45 fps | **60 fps** |
-| UI FPS with tooltip | 30–40 fps | **60 fps** |
-| UI FPS with 6 PriceText | 25–35 fps | **57–60 fps** |
-| JS thread during gesture | Occasional drops | **Solid 60 fps** |
-| Mapper count (100 candles) | 200+ | **~10** |
-| Native views (100 candles) | 200+ SVG elements | **1 Canvas** |
+| Registered mappers (100 candles) | 200+ (per-candle `useAnimatedProps`) | **0** (pre-computed geometry) |
+| Native views (100 candles) | 200 SVG elements | **1 Canvas** |
+| React components (100 candles) | 100 `CandlestickChartCandle` | **0** (raw Skia elements) |
+| Shared value writes per gesture frame | Unguarded (always writes) | **Guarded** (skips if unchanged) |
+| OHLC price computation | Per-consumer | **Shared** (1 `useDerivedValue` in context) |
 
 ### Developer Experience
 
 - **Same composable API** — the component tree structure is identical to v2. Most apps can upgrade by changing dependencies and fixing a few prop names (see [Migration Guide](./migration-v2-to-v3.md)).
-- **Better debugging** — fewer mappers and shared values make it easier to trace performance issues.
+- **Fewer moving parts** — fewer mappers and shared values make it easier to trace performance issues.
 - **Future-proof** — Skia is actively maintained by Shopify and is the rendering engine behind many high-performance React Native apps.
 
-### Bundle Size
+### For Apps Already Using Skia
 
-- `react-native-svg` is no longer a dependency (though you can keep it for other parts of your app)
-- `@shopify/react-native-skia` is likely already in your app if you use other Skia-based libraries
+If your app already depends on `@shopify/react-native-skia` (for other charting, image processing, or custom drawing), v3 means:
+
+- **You can drop `react-native-svg`** as a dependency if this library was the only reason you had it. That's one fewer native module to install, link, build, and maintain across iOS and Android.
+- **No additional native binary size** — Skia is already in your app, so wagmi-charts adds zero native overhead.
+- **Consistent rendering stack** — your entire app uses one graphics engine instead of two.
 
 ---
 
@@ -211,7 +204,7 @@ This reduces JS thread bouncing from ~60 calls/sec to ~5-10 calls/sec during a t
 
 ### New Dependency
 
-v3 requires `@shopify/react-native-skia` and `react-native-worklets` as peer dependencies. If your app doesn't already use Skia, this adds to your native binary size.
+v3 requires `@shopify/react-native-skia` and `react-native-worklets` as peer dependencies. If your app doesn't already use Skia, this adds a new native dependency. See the [Compatibility table](./README.md#compatibility) for minimum versions.
 
 ### Custom Renderers Are Slower
 
@@ -226,4 +219,4 @@ If you have custom chart overlays built with `react-native-svg`, they won't rend
 
 ### AnimatedTextInput Scaling
 
-Each `PriceText`/`DatetimeText` component uses an `AnimatedTextInput` under the hood. Reanimated's `updateProps` for native text updates has a fixed per-call cost. With many text components (10+), this becomes the bottleneck — not the chart itself. This is a Reanimated platform limitation, not specific to this library. In production, 1–3 text components is the sweet spot.
+Each `PriceText`/`DatetimeText` component uses an `AnimatedTextInput` under the hood. Reanimated's `updateProps` for native text updates has a fixed per-call cost. With many text components (10+), this becomes the bottleneck — not the chart itself. This is a Reanimated limitation, not specific to this library. In production, 1–3 text components is the sweet spot.

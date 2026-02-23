@@ -193,9 +193,9 @@ The `vec()` objects and geometry are pre-computed, so the Canvas picture is reco
 
 ### Throttled Callbacks
 
-**Problem:** `onCurrentXChange` (candlestick) fired on every `currentX` pixel change, causing `scheduleOnRN` to bounce to the JS thread ~60 times/sec.
+**Problem:** In v2, `onCurrentXChange` tracked `currentX.value` via `useAnimatedReaction`. While `currentX` was snapped to candle centers (not raw pixels), it still changed on each candle boundary crossing and the unguarded writes meant the reaction could fire redundantly.
 
-**Solution:** Fire only when `currentIndex` changes (candle boundary crossing):
+**Solution:** v3 tracks `currentIndex` instead, which is semantically clearer and avoids edge cases:
 
 ```js
 useAnimatedReaction(
@@ -216,10 +216,11 @@ Key reductions in v3:
 
 | Optimization | Mappers Saved |
 |---|---|
-| Single tooltip (was 2 with opacity toggle) | 2 mappers |
-| Shared candle in context (was per-consumer) | N-1 mappers |
+| Single tooltip instead of 2 (v2 rendered left + right with opacity toggle, 4 mappers → 1) | 3 mappers |
+| Shared candle in context (was per-consumer `useDerivedValue`) | N-1 mappers |
 | Split crosshair/OHLC hooks | Prevents OHLC mappers from firing every frame |
 | Eliminated redundant `useDerivedValue` chain in line `useDatetime` | 1 mapper per DatetimeText |
+| Raw Skia elements instead of per-candle `useAnimatedProps` | 200 mappers for 100 candles |
 
 ---
 
@@ -229,15 +230,9 @@ Key reductions in v3:
 
 Each `PriceText` or `DatetimeText` component creates an `AnimatedTextInput` with a `useAnimatedProps` mapper. Each mapper calls Reanimated's `updateProps` to synchronously update the native `text` property.
 
-**Benchmark (candlestick chart, iOS):**
+The more `AnimatedTextInput` instances you have, the more `updateProps` calls Reanimated makes per frame. Each call has a fixed native overhead.
 
-| AnimatedTextInput Count | FPS During Gesture |
-|---|---|
-| 0 (chart + crosshair + tooltip only) | 60fps solid |
-| 6 (1 crosshair + 4 OHLC + 1 tooltip) | 57–60fps |
-| 16 (full example with all variants) | 47–50fps |
-
-**Recommendation:** In production, use 1–3 `PriceText`/`DatetimeText` components outside the chart. The example app intentionally uses 16 to stress-test.
+**Recommendation:** In production, use 1–3 `PriceText`/`DatetimeText` components outside the chart. The example app intentionally uses many more to stress-test.
 
 ### Prefer OHLC Types Over Crosshair
 
@@ -287,23 +282,12 @@ This is why the split between `useCrosshairPrice` (reads `currentY`) and `useCan
 
 ## Benchmarks
 
-Measured on iPhone 15 Pro, React Native 0.81, Reanimated 4, dev build (not Expo Go):
+> **Note:** These are observations from development testing, not formal benchmarks. Your results will vary depending on device, React Native version, and app complexity.
 
-### Candlestick Chart
+During development on a physical iOS device (React Native 0.81, Reanimated 4):
 
-| Configuration | UI FPS | JS FPS |
-|---|---|---|
-| Chart + Candles only (no interaction) | 60 | 60 |
-| Chart + Crosshair + Tooltip (during gesture) | 60 | 60 |
-| + 6 PriceText (1 crosshair + 4 OHLC + 1 tooltip) | 57–60 | 60 |
-| + 16 PriceText/DatetimeText (full example) | 47–50 | 60 |
+- **Chart + crosshair only** — UI thread stays at 60fps during gesture interaction
+- **Adding PriceText/DatetimeText** — each additional `AnimatedTextInput` adds a small per-frame cost. With 1–3 text components, the impact is negligible. With 10+, frame drops become noticeable.
+- **JS thread** — stays idle during gesture interaction in all configurations, since all work happens on the UI thread via worklets
 
-### Line Chart
-
-| Configuration | UI FPS | JS FPS |
-|---|---|---|
-| Chart + Path only (no interaction) | 60 | 60 |
-| Chart + CursorCrosshair + Tooltip (during gesture) | 60 | 60 |
-| + PriceText + DatetimeText | 57–60 | 60 |
-
-JS thread stays at 60fps in all cases because all interaction work happens on the UI thread via worklets.
+The primary bottleneck with many text components is Reanimated's `updateProps` native call, not the chart rendering itself.
