@@ -1,9 +1,9 @@
-import Animated, {
-  useAnimatedProps,
+import {
   useDerivedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { LineProps, Line as SVGLine } from 'react-native-svg';
+import { StyleSheet } from 'react-native';
+import { Canvas, Line, DashPathEffect } from '@shopify/react-native-skia';
 
 import { LineChartDimensionsContext } from './Chart';
 import React from 'react';
@@ -11,11 +11,11 @@ import { getXPositionForCurve } from './utils/getXPositionForCurve';
 import { getYForX } from 'react-native-redash';
 import { useLineChart } from './useLineChart';
 
-const AnimatedLine = Animated.createAnimatedComponent(SVGLine);
-
 type HorizontalLineProps = {
   color?: string;
-  lineProps?: Partial<LineProps>;
+  strokeWidth?: number;
+  dashWidth?: number;
+  dashGap?: number;
   offsetY?: number;
   /**
    * (Optional) A pixel value to nudge the line up or down.
@@ -46,7 +46,9 @@ LineChartHorizontalLine.displayName = 'LineChartHorizontalLine';
 
 export function LineChartHorizontalLine({
   color = 'gray',
-  lineProps = {},
+  strokeWidth = 2,
+  dashWidth = 3,
+  dashGap = 3,
   at = { index: 0 },
   offsetY = 0,
 }: HorizontalLineProps) {
@@ -80,23 +82,20 @@ export function LineChartHorizontalLine({
     return withTiming(offsetTopPixels + offsetY);
   }, [at, gutter, height, offsetY, parsedPath, yDomain.max, yDomain.min]);
 
-  const lineAnimatedProps = useAnimatedProps(
-    () => ({
-      x1: 0,
-      x2: width,
-      y1: y.value,
-      y2: y.value,
-    }),
-    [width, y]
-  );
+  const p1 = useDerivedValue(() => ({ x: 0, y: y.value }), [y]);
+  const p2 = useDerivedValue(() => ({ x: width, y: y.value }), [y, width]);
 
   return (
-    <AnimatedLine
-      animatedProps={lineAnimatedProps}
-      strokeWidth={2}
-      stroke={color}
-      strokeDasharray="3 3"
-      {...lineProps}
-    />
+    <Canvas style={StyleSheet.absoluteFill}>
+      <Line
+        p1={p1}
+        p2={p2}
+        strokeWidth={strokeWidth}
+        color={color}
+        style="stroke"
+      >
+        <DashPathEffect intervals={[dashWidth, dashGap]} />
+      </Line>
+    </Canvas>
   );
 }

@@ -18,7 +18,7 @@ A sweet & simple chart library for React Native that will make us feel like
 
 🛠 Highly customizable APIs
 
-✨ Uses React Native Reanimated 2 under-the-hood
+✨ Powered by [@shopify/react-native-skia](https://shopify.github.io/react-native-skia/) & React Native Reanimated
 
 🧈 Slick data transition animations
 
@@ -82,6 +82,7 @@ A sweet & simple chart library for React Native that will make us feel like
   - [CandlestickChart.useCandleData](#candlestickchartusecandledata)
   - [CandlestickChart.useDatetime](#candlestickchartusedatetime)
   - [CandlestickChart.usePrice](#candlestickchartuseprice)
+- [Migrating from v2 to v3](#migrating-from-v2-to-v3)
 - [Web Support](#web-support)
 - [Credits](#credits)
 
@@ -98,8 +99,10 @@ WAGMI charts also depends on a few libraries, you will also need to install
 these packages if you don't already have them:
 
 ```bash
-npm install react-native-reanimated react-native-gesture-handler react-native-haptic-feedback
+npm install @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets react-native-haptic-feedback
 ```
+
+> **Note:** v3 uses `@shopify/react-native-skia` for rendering instead of `react-native-svg`. If you are upgrading from v2, see the [Migration Guide](#migrating-from-v2-to-v3) below.
 
 ## Basic Usage
 
@@ -482,6 +485,15 @@ provide a color prop to `LineChart.Gradient`.
 ```
 
 <img width="345" alt="Screen Shot 2021-10-25 at 8 32 26 pm" src="https://user-images.githubusercontent.com/7336481/138672153-9ba11b02-b750-4ab0-a2e2-c18a9af4635f.png">
+
+You can also fully customize the gradient colors and stop positions:
+
+```jsx
+<LineChart.Gradient
+  colors={['rgba(255,0,0,0.3)', 'rgba(255,0,0,0.05)', 'rgba(255,0,0,0)']}
+  positions={[0.2, 0.5, 1.0]}
+/>
+```
 
 ### Dots
 
@@ -926,11 +938,12 @@ function in the form of a
 
 ### LineChart.Path
 
-| Prop        | Type        | Default   | Description                      |
-| ----------- | ----------- | --------- | -------------------------------- |
-| `color`     | `string`    | `"black"` | Color of the line path           |
-| `width`     | `number`    | `3`       | Width of the line path           |
-| `pathProps` | `PathProps` | `{}`      | React Native SVG's `Path` props. |
+| Prop                   | Type      | Default   | Description                                          |
+| ---------------------- | --------- | --------- | ---------------------------------------------------- |
+| `color`                | `string`  | `"black"` | Color of the line path                               |
+| `width`                | `number`  | `3`       | Width of the line path                               |
+| `inactiveColor`        | `string`  |           | Color of the path when the chart is inactive         |
+| `isTransitionEnabled`  | `boolean` | `true`    | Whether path changes should animate                  |
 
 ### LineChart.CursorCrosshair
 
@@ -949,12 +962,14 @@ function in the form of a
 
 ### LineChart.CursorLine
 
-| Prop           | Type        | Default  | Description                                                        |
-| -------------- | ----------- | -------- | ------------------------------------------------------------------ |
-| `color`        | `string`    | `"gray"` | Color of the cursor line                                           |
-| `lineProps`    | `LineProps` |          | Props of the cursor line. Takes React Native SVG's `Line` props.   |
-| `persistOnEnd` | `boolean`   | `false`  | Keep the cursor pinned at its last position after the gesture ends |
-| `at`           | `number`    |          | Index of followed `data` item.                                     |
+| Prop           | Type      | Default  | Description                                                        |
+| -------------- | --------- | -------- | ------------------------------------------------------------------ |
+| `color`        | `string`  | `"gray"` | Color of the cursor line                                           |
+| `strokeWidth`  | `number`  | `2`      | Width of the cursor line stroke                                    |
+| `dashWidth`    | `number`  | `3`      | Width of each dash segment                                         |
+| `dashGap`      | `number`  | `3`      | Gap between dash segments                                          |
+| `persistOnEnd` | `boolean` | `false`  | Keep the cursor pinned at its last position after the gesture ends |
+| `at`           | `number`  |          | Index of followed `data` item.                                     |
 
 ### LineChart.Dot
 
@@ -970,8 +985,8 @@ function in the form of a
 | `outerSize`         | `number`                         | `16`               | Size of the outer dot.                                                                                                                                                                   |
 | `pulseBehaviour`    | `"while-inactive"` or `"always"` | `"while-inactive"` | Behaviour of the pulse. If `always`, the outer dot will still animate when interaction is active. If `while-inactive`, the outer dot will animate only when the interaction is inactive. |
 | `pulseDurationMs`   | `number`                         | `800`              | Duration in ms of the pulse animation.                                                                                                                                                   |
-| `dotProps`          | `CircleProps`                    |                    | Props of the dot (accepts React Native SVG's `Circle` props).                                                                                                                            |
-| `outerDotProps`     | `CircleProps`                    |                    | Props of the outer dot (accepts React Native SVG's `Circle` props).                                                                                                                      |
+| `dotProps`          | `CircleProps`                    |                    | Props of the dot (accepts Skia's `Circle` props).                                                                                                                                        |
+| `outerDotProps`     | `CircleProps`                    |                    | Props of the outer dot (accepts Skia's `Circle` props).                                                                                                                                  |
 
 ### LineChart.Highlight
 
@@ -986,18 +1001,22 @@ function in the form of a
 
 ### LineChart.HorizontalLine
 
-| Prop        | Type                                                   | Default  | Description                                                                                                |
-| ----------- | ------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `color`     | `string`                                               | `"gray"` | Color of the cursor line                                                                                   |
-| `lineProps` | `LineProps`                                            |          | Props of the cursor line. Takes React Native SVG's `Line` props.                                           |
-| `at`        | `number` or `{ index: number }` or `{ value: number }` | `0`      | Index of followed `data` item. You can alternatively pass `{ value: number }`, corresponding to a y value. |
+| Prop          | Type                                                   | Default  | Description                                                                                                |
+| ------------- | ------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `color`       | `string`                                               | `"gray"` | Color of the horizontal line                                                                               |
+| `strokeWidth` | `number`                                               | `2`      | Width of the line stroke                                                                                   |
+| `dashWidth`   | `number`                                               | `3`      | Width of each dash segment                                                                                 |
+| `dashGap`     | `number`                                               | `3`      | Gap between dash segments                                                                                  |
+| `at`          | `number` or `{ index: number }` or `{ value: number }` | `0`      | Index of followed `data` item. You can alternatively pass `{ value: number }`, corresponding to a y value. |
+| `offsetY`     | `number`                                               | `0`      | Pixel offset to nudge the line up or down                                                                  |
 
 ### LineChart.Gradient
 
-| Prop       | Type        | Default | Description           |
-| ---------- | ----------- | ------- | --------------------- |
-| `color`    | `string`    |         | Color of the gradient |
-| `...props` | `PathProps` |         |                       |
+| Prop        | Type       | Default | Description                                                                  |
+| ----------- | ---------- | ------- | ---------------------------------------------------------------------------- |
+| `color`     | `string`   |         | Color of the gradient (inherits path color if not set)                       |
+| `colors`    | `string[]` |         | Custom gradient colors array. Overrides the default gradient based on color. |
+| `positions` | `number[]` |         | Gradient stop positions (0 to 1). Must match the length of `colors`.         |
 
 ### LineChart.Tooltip
 
@@ -1070,15 +1089,14 @@ this as the child of your lowest-rendered cursor.
 
 ### CandlestickChart.Candles
 
-| Prop            | Type                                                                                                                            | Default   | Description                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
-| `positiveColor` | `string`                                                                                                                        | `#10b981` | Color of the positive candles                                      |
-| `negativeColor` | `string`                                                                                                                        | `#ef4444` | Color of the negative candles                                      |
-| `rectProps`     | `RectProps`                                                                                                                     |           | Props of the SVG Rectangle. Takes React Native's SVG `Rect` props. |
-| `lineProps`     | `LineProps`                                                                                                                     |           | Props of the SVG Line. Takes React Native's SVG `Line` props.      |
-| `renderRect`    | `({ x: number, y: number, width: number, height: number, fill: string, candle: TCandle }) => React.ReactNode`                   |           | Renders a custom rect component                                    |
-| `renderLine`    | `({ x1: number, x2: number, y1: number, y2: number, stroke: string, strokeWidth: number, candle: TCandle }) => React.ReactNode` |           | Renders a custom line component                                    |
-| `...props`      | `SvgProps`                                                                                                                      |           | This component also inherits React Native SVG's `Svg` props.       |
+| Prop            | Type                                                                                                                                                   | Default   | Description                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ----------------------------- |
+| `positiveColor` | `string`                                                                                                                                               | `#10b981` | Color of the positive candles |
+| `negativeColor` | `string`                                                                                                                                               | `#ef4444` | Color of the negative candles |
+| `renderRect`    | `({ x: number, y: number, width: number, height: number, color: string, useAnimations: boolean, candle: TCandle }) => React.ReactNode`                 |           | Renders a custom rect component  |
+| `renderLine`    | `({ p1: { x, y }, p2: { x, y }, color: string, strokeWidth: number, useAnimations: boolean, candle: TCandle }) => React.ReactNode`                     |           | Renders a custom line component  |
+| `candleProps`   | `Partial<CandlestickChartCandleProps>`                                                                                                                 |           | Additional props passed to each candle |
+| `useAnimations` | `boolean`                                                                                                                                              | `true`    | Whether candle transitions should animate |
 
 ### CandlestickChart.Crosshair
 
@@ -1282,6 +1300,65 @@ const { value, formatted } = CandlestickChart.usePrice({
 | `value`     | `string` |         | Price value           |
 | `formatted` | `string` |         | Formatted price value |
 
+## Migrating from v2 to v3
+
+v3 replaces `react-native-svg` with `@shopify/react-native-skia` for rendering. Most usage remains identical — here are the breaking changes:
+
+### New dependencies
+
+```bash
+# Install new dependencies
+npm install @shopify/react-native-skia react-native-worklets
+
+# react-native-svg is no longer required by this library
+# (you can keep it if other parts of your app use it)
+```
+
+### LineChart.Gradient
+
+The `children` prop (SVG `<Stop>` elements) is replaced with `colors` and `positions` arrays:
+
+```diff
+- <LineChart.Gradient color="blue">
+-   <Stop offset="20%" stopColor="blue" stopOpacity={0.15} />
+-   <Stop offset="40%" stopColor="blue" stopOpacity={0.05} />
+-   <Stop offset="100%" stopColor="blue" stopOpacity={0} />
+- </LineChart.Gradient>
++ <LineChart.Gradient
++   color="blue"
++   colors={['rgba(0,0,255,0.15)', 'rgba(0,0,255,0.05)', 'rgba(0,0,255,0)']}
++   positions={[0.2, 0.4, 1.0]}
++ />
+```
+
+Using `<LineChart.Gradient />` or `<LineChart.Gradient color="blue" />` without custom stops works identically — **no change needed**.
+
+### LineChart.CursorLine
+
+`lineProps` (SVG `LineProps`) is replaced with explicit props:
+
+```diff
+- <LineChart.CursorLine lineProps={{ strokeWidth: 1, strokeDasharray: "4 4" }} />
++ <LineChart.CursorLine strokeWidth={1} dashWidth={4} dashGap={4} />
+```
+
+### LineChart.HorizontalLine
+
+`lineProps` is replaced with explicit `strokeWidth`, `dashWidth`, and `dashGap` props.
+
+### LineChart.Dot
+
+`dotProps` and `outerDotProps` now accept Skia `CircleProps` instead of SVG `CircleProps`. The prop names are unchanged.
+
+### LineChart.Path / LineChart.Highlight
+
+The SVG `...props` spread (`AnimatedProps<PathProps>`) is no longer accepted. Only the documented props (`color`, `inactiveColor`, `width`, `isTransitionEnabled`) are supported.
+
+### CandlestickChart.Candles
+
+- `rectProps` and `lineProps` (SVG-specific overrides) are removed
+- `renderRect` and `renderLine` custom render functions still work but receive Skia-compatible props (`color` instead of `fill`/`stroke`, `p1`/`p2` instead of `x1`/`y1`/`x2`/`y2`)
+
 ## Web Support
 
 Web support is currently experimental.
@@ -1302,12 +1379,6 @@ const isWeb = Platform.OS === 'web'
   }}
 />;
 ```
-
-### Reanimated Version
-
-In order to support SVG animations on Web, you'll need at least Reanimated
-version `2.3.0-beta.2`. Or, you can use the patch from
-[Issue #8](https://github.com/coinjar/react-native-wagmi-charts/issues/8#issuecomment-938097099).
 
 ## Credits
 

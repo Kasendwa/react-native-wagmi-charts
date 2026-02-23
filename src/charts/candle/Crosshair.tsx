@@ -10,9 +10,9 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedReaction,
-  runOnJS,
   AnimatedProps,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { clamp } from 'react-native-redash';
 
 import { CandlestickChartDimensionsContext } from './Chart';
@@ -111,7 +111,7 @@ export function CandlestickChartCrosshair({
     () => currentX.value,
     (data, prevData) => {
       if (data !== -1 && data !== prevData && onCurrentXChange) {
-        runOnJS(onCurrentXChange)(data);
+        scheduleOnRN(onCurrentXChange, data);
       }
     },
     [currentX]

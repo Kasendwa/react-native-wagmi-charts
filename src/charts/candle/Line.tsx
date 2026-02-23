@@ -1,31 +1,35 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import Svg, { Line as SVGLine, LineProps } from 'react-native-svg';
+import { Canvas, Line, DashPathEffect, vec } from '@shopify/react-native-skia';
 
-export type CandlestickChartLineProps = Omit<LineProps, 'x' | 'y'> & {
+export type CandlestickChartLineProps = {
   color?: string;
   x: number;
   y: number;
+  strokeWidth?: number;
+  dashWidth?: number;
+  dashGap?: number;
 };
 
 export const CandlestickChartLine = ({
   color = 'gray',
   x,
   y,
-  ...props
+  strokeWidth = 2,
+  dashWidth = 6,
+  dashGap = 6,
 }: CandlestickChartLineProps) => {
   return (
-    <Svg style={StyleSheet.absoluteFill}>
-      <SVGLine
-        x1={0}
-        y1={0}
-        x2={x}
-        y2={y}
-        strokeWidth={2}
-        stroke={color}
-        strokeDasharray="6 6"
-        {...props}
-      />
-    </Svg>
+    <Canvas style={StyleSheet.absoluteFill}>
+      <Line
+        p1={vec(0, 0)}
+        p2={vec(x, y)}
+        strokeWidth={strokeWidth}
+        color={color}
+        style="stroke"
+      >
+        <DashPathEffect intervals={[dashWidth, dashGap]} />
+      </Line>
+    </Canvas>
   );
 };

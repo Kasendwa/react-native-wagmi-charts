@@ -1,13 +1,8 @@
 import * as React from 'react';
-import Animated, { AnimatedProps } from 'react-native-reanimated';
-import { Path, PathProps } from 'react-native-svg';
-import { LineChartDimensionsContext } from './Chart';
-import { LineChartPathContext } from './LineChartPathContext';
+import { Path as SkiaPath } from '@shopify/react-native-skia';
 import { useAnimatedPath } from './useAnimatedPath';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-export type LineChartPathProps = AnimatedProps<PathProps> & {
+export type LineChartPathProps = {
   color?: string;
   inactiveColor?: string;
   width?: number;
@@ -28,6 +23,8 @@ export type LineChartPathProps = AnimatedProps<PathProps> & {
    * ```
    */
   isTransitionEnabled?: boolean;
+  /** SVG path string — passed as prop since Skia Canvas doesn't propagate React context */
+  pathData?: string;
 };
 
 LineChartPath.displayName = 'LineChartPath';
@@ -36,25 +33,28 @@ export function LineChartPath({
   color = 'black',
   inactiveColor,
   width: strokeWidth = 3,
-  ...props
+  isInactive: isInactiveProp,
+  isTransitionEnabled: isTransitionEnabledProp = true,
+  pathData = '',
 }: LineChartPathProps) {
-  const { path } = React.useContext(LineChartDimensionsContext);
-  const { isTransitionEnabled, isInactive } =
-    React.useContext(LineChartPathContext);
+  const isInactive = isInactiveProp ?? false;
+  const isTransitionEnabled = isTransitionEnabledProp;
 
-  const { animatedProps } = useAnimatedPath({
+  const { animatedPath } = useAnimatedPath({
     enabled: isTransitionEnabled,
-    path,
+    path: pathData,
   });
 
+  const strokeColor = isInactive ? inactiveColor || color : color;
+  const strokeOpacity = isInactive && !inactiveColor ? 0.2 : 1;
+
   return (
-    <AnimatedPath
-      animatedProps={animatedProps}
-      fill="transparent"
-      stroke={isInactive ? inactiveColor || color : color}
-      strokeOpacity={isInactive && !inactiveColor ? 0.2 : 1}
+    <SkiaPath
+      path={animatedPath}
+      style="stroke"
+      color={strokeColor}
+      opacity={strokeOpacity}
       strokeWidth={strokeWidth}
-      {...props}
     />
   );
 }

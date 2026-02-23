@@ -3,9 +3,8 @@ import { StyleSheet, type TextStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useDerivedValue,
-  useAnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { type LineProps, Line as SVGLine } from 'react-native-svg';
+import { Canvas, Line, DashPathEffect } from '@shopify/react-native-skia';
 
 import type { TFormatterFn } from '../../types';
 import { AnimatedText } from '../../components/AnimatedText';
@@ -18,7 +17,9 @@ import { useLineChartPrice } from './usePrice';
 type LineChartCursorLineProps = {
   children?: React.ReactNode;
   color?: string;
-  lineProps?: Partial<LineProps>;
+  strokeWidth?: number;
+  dashWidth?: number;
+  dashGap?: number;
   format?: TFormatterFn<string | number>;
   textStyle?: TextStyle;
   persistOnEnd?: boolean;
@@ -43,12 +44,12 @@ const SPACING = {
   X_AXIS_LABEL_RESERVED_HEIGHT: 40, // Reserved space at bottom for x-axis labels
 } as const;
 
-const AnimatedLine = Animated.createAnimatedComponent(SVGLine);
-
 export function LineChartCursorLine({
   children,
   color = 'gray',
-  lineProps,
+  strokeWidth = 2,
+  dashWidth = 3,
+  dashGap = 3,
   format,
   textStyle,
   ...cursorProps
@@ -86,26 +87,21 @@ export function LineChartCursorLine({
     return calculateTextWidth(text, fontSize);
   }, [displayText, textStyle?.fontSize]);
 
-  const lineEndX = useDerivedValue(() => {
-    if (!isHorizontal) return 0;
-
-    const fontSize = textStyle?.fontSize || TEXT_CONSTANTS.DEFAULT_FONT_SIZE;
-    const gap = Math.max(SPACING.BASE_LINE_GAP, fontSize * 0.5);
-
-    return (
-      width -
-      textWidth.value -
-      gap -
-      TEXT_CONSTANTS.INPUT_PADDING -
-      SPACING.HORIZONTAL_RIGHT_MARGIN
-    );
-  });
-
-  const lineEndY = useDerivedValue(() => {
-    if (isHorizontal) return 0;
-
+  const lineEnd = useDerivedValue(() => {
+    if (isHorizontal) {
+      const fontSize = textStyle?.fontSize || TEXT_CONSTANTS.DEFAULT_FONT_SIZE;
+      const gap = Math.max(SPACING.BASE_LINE_GAP, fontSize * 0.5);
+      return {
+        x: width -
+          textWidth.value -
+          gap -
+          TEXT_CONSTANTS.INPUT_PADDING -
+          SPACING.HORIZONTAL_RIGHT_MARGIN,
+        y: 0,
+      };
+    }
     // For vertical cursor, extend line to the chart area (excluding reserved label space)
-    return height - SPACING.X_AXIS_LABEL_RESERVED_HEIGHT;
+    return { x: 0, y: height - SPACING.X_AXIS_LABEL_RESERVED_HEIGHT };
   });
 
   const containerStyle = useAnimatedStyle(() => ({
@@ -186,28 +182,22 @@ export function LineChartCursorLine({
     };
   });
 
-  const lineAnimatedProps = useAnimatedProps(
-    () => ({
-      x1: 0,
-      y1: 0,
-      x2: lineEndX.value,
-      y2: lineEndY.value,
-    }),
-    [lineEndX, lineEndY]
-  );
+  const lineStart = useDerivedValue(() => ({ x: 0, y: 0 }));
 
   return (
     <LineChartCursor {...cursorProps} type="line">
       <Animated.View style={containerStyle}>
-        <Svg style={styles.svg}>
-          <AnimatedLine
-            animatedProps={lineAnimatedProps}
-            strokeWidth={2}
-            stroke={color}
-            strokeDasharray="3 3"
-            {...lineProps}
-          />
-        </Svg>
+        <Canvas style={styles.canvas}>
+          <Line
+            p1={lineStart}
+            p2={lineEnd}
+            strokeWidth={strokeWidth}
+            color={color}
+            style="stroke"
+          >
+            <DashPathEffect intervals={[dashWidth, dashGap]} />
+          </Line>
+        </Canvas>
         <AnimatedText text={displayText} style={textPositionStyle} />
       </Animated.View>
       {children}
@@ -216,7 +206,7 @@ export function LineChartCursorLine({
 }
 
 const styles = StyleSheet.create({
-  svg: {
+  canvas: {
     ...StyleSheet.absoluteFillObject,
     height: '100%',
   },

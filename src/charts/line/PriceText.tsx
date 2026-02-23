@@ -5,8 +5,8 @@ import type { AnimatedProps } from 'react-native-reanimated';
 import {
   useDerivedValue,
   useAnimatedReaction,
-  runOnJS,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useLineChartPrice } from './usePrice';
 import { useLineChart } from './useLineChart';
 import type { TFormatterFn } from '../../types';
@@ -80,12 +80,12 @@ export function LineChartPriceText({
       return format({ value: valueString, formatted: valueString });
     }, [currentIndex, data, precision]);
 
-    // Use useAnimatedReaction to update React state with runOnJS
+    // Use useAnimatedReaction to update React state via scheduleOnRN
     useAnimatedReaction(
       () => textValue.value,
       (current, previous) => {
         if (current !== previous) {
-          runOnJS(updateText)(current);
+          scheduleOnRN(updateText, current);
         }
       },
       [textValue]

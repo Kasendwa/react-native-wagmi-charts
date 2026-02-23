@@ -1,20 +1,16 @@
 import React from 'react';
-import { Svg, SvgProps } from 'react-native-svg';
+import { Canvas } from '@shopify/react-native-skia';
 
 import { CandlestickChartDimensionsContext } from './Chart';
 import { CandlestickChartCandle, CandlestickChartCandleProps } from './Candle';
 import { useCandlestickChart } from './useCandlestickChart';
 
-type CandlestickChartCandlesProps = SvgProps & {
-  width?: number;
-  height?: number;
+type CandlestickChartCandlesProps = {
   margin?: CandlestickChartCandleProps['margin'];
   positiveColor?: CandlestickChartCandleProps['positiveColor'];
   negativeColor?: CandlestickChartCandleProps['negativeColor'];
   renderRect?: CandlestickChartCandleProps['renderRect'];
   renderLine?: CandlestickChartCandleProps['renderLine'];
-  rectProps?: CandlestickChartCandleProps['rectProps'];
-  lineProps?: CandlestickChartCandleProps['lineProps'];
   candleProps?: Partial<CandlestickChartCandleProps>;
   useAnimations?: boolean;
 };
@@ -22,20 +18,17 @@ type CandlestickChartCandlesProps = SvgProps & {
 export function CandlestickChartCandles({
   positiveColor,
   negativeColor,
-  rectProps,
-  lineProps,
   margin,
   useAnimations = true,
   renderRect,
   renderLine,
   candleProps,
-  ...props
 }: CandlestickChartCandlesProps) {
   const { width, height } = React.useContext(CandlestickChartDimensionsContext);
   const { data, domain, step } = useCandlestickChart();
 
   return (
-    <Svg width={width} height={height} {...props}>
+    <Canvas style={{ width, height }}>
       {step > 0 &&
         data.map((candle, index) => (
           <CandlestickChartCandle
@@ -48,14 +41,12 @@ export function CandlestickChartCandles({
             negativeColor={negativeColor}
             renderRect={renderRect}
             renderLine={renderLine}
-            rectProps={rectProps}
-            lineProps={lineProps}
             useAnimations={useAnimations}
             candle={candle}
             index={index}
             {...candleProps}
           />
         ))}
-    </Svg>
+    </Canvas>
   );
 }

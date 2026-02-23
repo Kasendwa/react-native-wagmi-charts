@@ -1,20 +1,21 @@
 import * as React from 'react';
-import Animated, { AnimatedProps } from 'react-native-reanimated';
-import { ClipPath, Defs, G, Path, PathProps, Rect } from 'react-native-svg';
+import { StyleSheet } from 'react-native';
+import { Canvas, Group, Path as SkiaPath } from '@shopify/react-native-skia';
+import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { LineChartDimensionsContext } from './Chart';
 import { LineChartPathContext } from './LineChartPathContext';
 import { useAnimatedPath } from './useAnimatedPath';
 import { getXPositionForCurve } from './utils/getXPositionForCurve';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-export type LineChartColorProps = AnimatedProps<PathProps> & {
+export type LineChartColorProps = {
   color?: string;
   from: number;
   to: number;
   showInactiveColor?: boolean;
   inactiveColor?: string;
   width?: number;
+  /** @internal Injected by ChartPath for foreground clipping */
+  _foregroundClip?: SharedValue<{ x: number; y: number; width: number; height: number }>;
 };
 
 LineChartHighlight.displayName = 'LineChartHighlight';
@@ -26,7 +27,7 @@ export function LineChartHighlight({
   from,
   to,
   width: strokeWidth = 3,
-  ...props
+  _foregroundClip,
 }: LineChartColorProps) {
   const { path, parsedPath, height } = React.useContext(
     LineChartDimensionsContext
@@ -37,43 +38,35 @@ export function LineChartHighlight({
 
   ////////////////////////////////////////////////
 
-  const { animatedProps } = useAnimatedPath({
+  const { animatedPath } = useAnimatedPath({
     enabled: isTransitionEnabled,
     path,
   });
 
   ////////////////////////////////////////////////
 
-  const clipId = React.useMemo(
-    () => `clip-${Math.random().toString(36).substring(2, 11)}`,
-    []
-  );
-
   const clipStart = getXPositionForCurve(parsedPath, from);
   const clipEnd = getXPositionForCurve(parsedPath, to);
 
-  return (
-    <G>
-      <Defs>
-        <ClipPath id={clipId}>
-          <Rect
-            x={clipStart}
-            y="0"
-            width={clipEnd - clipStart}
-            height={height}
-            fill="white"
-          />
-        </ClipPath>
-      </Defs>
-      <AnimatedPath
-        clipPath={`url(#${clipId})`}
-        animatedProps={animatedProps}
-        fill="transparent"
-        stroke={isInactive ? inactiveColor || color : color}
+  const clipRect = useDerivedValue(() => {
+    return { x: clipStart, y: 0, width: clipEnd - clipStart, height };
+  }, [clipStart, clipEnd, height]);
+
+  const content = (
+    <Group clip={clipRect}>
+      <SkiaPath
+        path={animatedPath}
+        style="stroke"
+        color={isInactive ? inactiveColor || color : color}
         strokeWidth={strokeWidth}
-        strokeOpacity={isInactive && !inactiveColor ? 0.5 : 1}
-        {...props}
+        opacity={isInactive && !inactiveColor ? 0.5 : 1}
       />
-    </G>
+    </Group>
+  );
+
+  return (
+    <Canvas style={StyleSheet.absoluteFill}>
+      {_foregroundClip ? <Group clip={_foregroundClip}>{content}</Group> : content}
+    </Canvas>
   );
 }

@@ -3,10 +3,19 @@
   "slug": "react-native-wagmi-charts-example",
   "description": "Example app for react-native-wagmi-charts",
   "version": "1.0.0",
-  "platforms": ["ios", "android", "web"],
+  "platforms": [
+    "ios",
+    "android",
+    "web"
+  ],
   "ios": {
-    "supportsTablet": true
+    "supportsTablet": true,
+    "bundleIdentifier": "com.ronaldkasendwa.react-native-wagmi-charts-example"
   },
-  "assetBundlePatterns": ["**/*"],
-  "plugins": ["expo-asset"]
+  "assetBundlePatterns": [
+    "**/*"
+  ],
+  "plugins": [
+    "expo-asset"
+  ]
 }

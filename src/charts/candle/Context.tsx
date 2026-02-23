@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  runOnJS,
   SharedValue,
   useAnimatedReaction,
   useSharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import type { TContext, TData, TDomain } from './types';
 import { getDomain } from './utils';
@@ -67,7 +67,7 @@ export function CandlestickChartProvider({
     () => currentIndex.value,
     (x, prevX) => {
       if (x !== prevX && onCurrentIndexChange) {
-        runOnJS(onCurrentIndexChange)(x);
+        scheduleOnRN(onCurrentIndexChange, x);
       }
     },
     [currentIndex]

@@ -1,16 +1,17 @@
 import React from 'react';
-import { ColorValue } from 'react-native';
-import Animated, {
+import {
+  useSharedValue,
+  useDerivedValue,
   withTiming,
-  useAnimatedProps,
+  useAnimatedReaction,
 } from 'react-native-reanimated';
-import { Line, LineProps, NumberProp, Rect, RectProps } from 'react-native-svg';
+import {
+  Line,
+  Rect,
+} from '@shopify/react-native-skia';
 
 import type { TCandle, TDomain } from './types';
 import { getY, getHeight } from './utils';
-
-const AnimatedRect = Animated.createAnimatedComponent(Rect);
-const AnimatedLine = Animated.createAnimatedComponent(Line);
 
 export type CandlestickChartCandleProps = {
   candle: TCandle;
@@ -21,25 +22,21 @@ export type CandlestickChartCandleProps = {
   negativeColor?: string;
   index: number;
   width: number;
-  rectProps?: RectProps;
-  lineProps?: LineProps;
   useAnimations?: boolean;
   renderRect?: (renderRectOptions: {
-    x: NumberProp;
-    y: NumberProp;
-    width: NumberProp;
-    height: NumberProp;
-    fill: ColorValue;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color: string;
     useAnimations: boolean;
     candle: TCandle;
   }) => React.ReactNode;
   renderLine?: (renderLineOptions: {
-    x1: NumberProp;
-    y1: NumberProp;
-    x2: NumberProp;
-    y2: NumberProp;
-    stroke: ColorValue;
-    strokeWidth: NumberProp;
+    p1: { x: number; y: number };
+    p2: { x: number; y: number };
+    color: string;
+    strokeWidth: number;
     useAnimations: boolean;
     candle: TCandle;
   }) => React.ReactNode;
@@ -52,15 +49,11 @@ export const CandlestickChartCandle = ({
   margin = 2,
   positiveColor = '#10b981',
   negativeColor = '#ef4444',
-  rectProps: overrideRectProps,
-  lineProps: overrideLineProps,
   index,
   width,
   useAnimations = true,
-  renderLine = (props) =>
-    props.useAnimations ? <AnimatedLine {...props} /> : <Line {...props} />,
-  renderRect = (props) =>
-    props.useAnimations ? <AnimatedRect {...props} /> : <Rect {...props} />,
+  renderLine,
+  renderRect,
 }: CandlestickChartCandleProps) => {
   const { close, open, high, low } = candle;
   const isPositive = close > open;
@@ -69,81 +62,89 @@ export const CandlestickChartCandle = ({
   const max = Math.max(open, close);
   const min = Math.min(open, close);
 
-  const lineProps = React.useMemo(
-    () => ({
-      stroke: fill,
-      strokeWidth: 1,
-      direction: isPositive ? 'positive' : 'negative',
-      x1: x + width / 2,
-      y1: getY({ maxHeight, value: low, domain }),
-      x2: x + width / 2,
-      y2: getY({ maxHeight, value: high, domain }),
-      candle: candle,
-      ...overrideLineProps,
-    }),
-    [
-      domain,
-      fill,
-      high,
-      isPositive,
-      low,
-      maxHeight,
-      overrideLineProps,
-      width,
-      x,
-      candle,
-    ]
-  );
-  const animatedLineProps = useAnimatedProps(() => ({
-    x1: withTiming(x + width / 2),
-    y1: withTiming(getY({ maxHeight, value: low, domain })),
-    x2: withTiming(x + width / 2),
-    y2: withTiming(getY({ maxHeight, value: high, domain })),
-  }));
+  // Target values
+  const targetLineX = x + width / 2;
+  const targetLowY = getY({ maxHeight, value: low, domain });
+  const targetHighY = getY({ maxHeight, value: high, domain });
+  const targetRectX = x + margin;
+  const targetRectY = getY({ maxHeight, value: max, domain });
+  const targetRectH = getHeight({ maxHeight, value: max - min, domain });
 
-  const rectProps = React.useMemo(
+  // Animated shared values
+  const lineX = useSharedValue(targetLineX);
+  const lowY = useSharedValue(targetLowY);
+  const highY = useSharedValue(targetHighY);
+  const animRectX = useSharedValue(targetRectX);
+  const animRectY = useSharedValue(targetRectY);
+  const animRectH = useSharedValue(targetRectH);
+
+  useAnimatedReaction(
     () => ({
-      width: width - margin * 2,
-      fill: fill,
-      direction: isPositive ? 'positive' : 'negative',
-      x: x + margin,
-      y: getY({ maxHeight, value: max, domain }),
-      height: getHeight({ maxHeight, value: max - min, domain }),
-      candle: candle,
-      ...overrideRectProps,
+      targetLineX,
+      targetLowY,
+      targetHighY,
+      targetRectX,
+      targetRectY,
+      targetRectH,
     }),
-    [
-      domain,
-      fill,
-      isPositive,
-      margin,
-      max,
-      maxHeight,
-      min,
-      overrideRectProps,
-      width,
-      x,
-      candle,
-    ]
+    (curr) => {
+      if (useAnimations) {
+        lineX.value = withTiming(curr.targetLineX);
+        lowY.value = withTiming(curr.targetLowY);
+        highY.value = withTiming(curr.targetHighY);
+        animRectX.value = withTiming(curr.targetRectX);
+        animRectY.value = withTiming(curr.targetRectY);
+        animRectH.value = withTiming(curr.targetRectH);
+      } else {
+        lineX.value = curr.targetLineX;
+        lowY.value = curr.targetLowY;
+        highY.value = curr.targetHighY;
+        animRectX.value = curr.targetRectX;
+        animRectY.value = curr.targetRectY;
+        animRectH.value = curr.targetRectH;
+      }
+    },
+    [targetLineX, targetLowY, targetHighY, targetRectX, targetRectY, targetRectH, useAnimations]
   );
-  const animatedRectProps = useAnimatedProps(() => ({
-    x: withTiming(x + margin),
-    y: withTiming(getY({ maxHeight, value: max, domain })),
-    height: withTiming(getHeight({ maxHeight, value: max - min, domain })),
-  }));
+
+  const lineP1 = useDerivedValue(() => ({ x: lineX.value, y: lowY.value }));
+  const lineP2 = useDerivedValue(() => ({ x: lineX.value, y: highY.value }));
+
+  if (renderLine || renderRect) {
+    const lineProps = {
+      p1: { x: targetLineX, y: targetLowY },
+      p2: { x: targetLineX, y: targetHighY },
+      color: fill,
+      strokeWidth: 1,
+      useAnimations,
+      candle,
+    };
+    const rectPropsCustom = {
+      x: targetRectX,
+      y: targetRectY,
+      width: width - margin * 2,
+      height: targetRectH,
+      color: fill,
+      useAnimations,
+      candle,
+    };
+
+    return (
+      <>
+        {renderLine ? renderLine(lineProps) : (
+          <Line p1={lineP1} p2={lineP2} color={fill} strokeWidth={1} style="stroke" />
+        )}
+        {renderRect ? renderRect(rectPropsCustom) : (
+          <Rect x={animRectX} y={animRectY} width={width - margin * 2} height={animRectH} color={fill} />
+        )}
+      </>
+    );
+  }
 
   return (
     <>
-      {renderLine({
-        ...lineProps,
-        useAnimations,
-        ...(useAnimations ? { animatedProps: animatedLineProps } : {}),
-      })}
-      {renderRect({
-        ...rectProps,
-        useAnimations,
-        ...(useAnimations ? { animatedProps: animatedRectProps } : {}),
-      })}
+      <Line p1={lineP1} p2={lineP2} color={fill} strokeWidth={1} style="stroke" />
+      <Rect x={animRectX} y={animRectY} width={width - margin * 2} height={animRectH} color={fill} />
     </>
   );
 };

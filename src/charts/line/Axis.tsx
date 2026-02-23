@@ -6,7 +6,7 @@ import {
   TextStyle,
   ViewStyle,
 } from 'react-native';
-import { Line, Svg } from 'react-native-svg';
+import { Canvas, Line, vec } from '@shopify/react-native-skia';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { LineChartDimensionsContext } from './Chart';
 import { useLineChart } from './useLineChart';
@@ -114,12 +114,11 @@ export const LineChartAxis = ({
           ticks.push(
             <Line
               key={`tick-${i}`}
-              x1={x}
-              y1={y}
-              x2={position === 'left' ? x - tickLength : x + tickLength}
-              y2={y}
-              stroke={color}
+              p1={vec(x, y)}
+              p2={vec(position === 'left' ? x - tickLength : x + tickLength, y)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
         }
@@ -164,12 +163,11 @@ export const LineChartAxis = ({
           ticks.push(
             <Line
               key={`tick-${i}`}
-              x1={x}
-              y1={y}
-              x2={x}
-              y2={position === 'top' ? y - tickLength : height - 15}
-              stroke={color}
+              p1={vec(x, y)}
+              p2={vec(x, position === 'top' ? y - tickLength : height - 15)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
         }
@@ -245,48 +243,44 @@ export const LineChartAxis = ({
         case 'left':
           axisLine = (
             <Line
-              x1={padding.left}
-              y1={0}
-              x2={padding.left}
-              y2={effectiveHeight}
-              stroke={color}
+              p1={vec(padding.left, 0)}
+              p2={vec(padding.left, effectiveHeight)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
           break;
         case 'right':
           axisLine = (
             <Line
-              x1={width - padding.right}
-              y1={0}
-              x2={width - padding.right}
-              y2={effectiveHeight}
-              stroke={color}
+              p1={vec(width - padding.right, 0)}
+              p2={vec(width - padding.right, effectiveHeight)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
           break;
         case 'top':
           axisLine = (
             <Line
-              x1={0}
-              y1={20}
-              x2={width}
-              y2={20}
-              stroke={color}
+              p1={vec(0, 20)}
+              p2={vec(width, 20)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
           break;
         case 'bottom':
           axisLine = (
             <Line
-              x1={0}
-              y1={height - 20}
-              x2={width}
-              y2={height - 20}
-              stroke={color}
+              p1={vec(0, height - 20)}
+              p2={vec(width, height - 20)}
+              color={color}
               strokeWidth={strokeWidth}
+              style="stroke"
             />
           );
           break;
@@ -302,10 +296,10 @@ export const LineChartAxis = ({
     <Animated.View
       style={[styles.container, containerStyle, props.style, animatedStyle]}
     >
-      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
+      <Canvas style={[StyleSheet.absoluteFill, { width, height }]}>
         {axisLine}
         {ticks}
-      </Svg>
+      </Canvas>
       <Animated.View style={[StyleSheet.absoluteFill, styles.labelsContainer]}>
         {labels}
       </Animated.View>
