@@ -30,7 +30,7 @@ v2 used `react-native-svg` for all chart rendering. While SVG is familiar and wo
 
 - **SVG elements are native views** — each `<Rect>` and `<Line>` is a real native view in the hierarchy, with layout and compositing overhead
 - **No direct SharedValue integration** — SVG elements can't read Reanimated `SharedValue` props natively; v2 used `Animated.createAnimatedComponent(Rect)` and `useAnimatedProps` to bridge this gap
-- **Heavy for large datasets** — 100 candles means 200 native SVG views (1 Rect + 1 Line per candle), each registered in the native view hierarchy
+- **Heavy for large datasets** — each candle requires 2 native SVG views (1 Rect + 1 Line), so N candles means 2N native views in the hierarchy
 
 Skia, by contrast, is a **GPU-accelerated 2D graphics engine** (the same one Chrome and Android use). `@shopify/react-native-skia` renders into a single GPU texture via its own React reconciler, bypassing the native view hierarchy.
 
@@ -42,11 +42,11 @@ Skia, by contrast, is a **GPU-accelerated 2D graphics engine** (the same one Chr
 
 ### SVG Rendering Overhead
 
-Every candlestick was rendered as individual SVG `<Rect>` and `<Line>` elements wrapped with `Animated.createAnimatedComponent()`. With 100 candles, that's:
+Every candlestick was rendered as individual SVG `<Rect>` and `<Line>` elements wrapped with `Animated.createAnimatedComponent()`. For N candles, that's:
 
-- **200 native SVG views** in the hierarchy
-- **200 `useAnimatedProps` mappers** — one per `AnimatedRect` and one per `AnimatedLine`, used for `withTiming` data transition animations
-- **100 React component instances** in the fiber tree
+- **2N native SVG views** in the hierarchy (1 Rect + 1 Line per candle)
+- **2N `useAnimatedProps` mappers** — one per `AnimatedRect` and one per `AnimatedLine`, used for `withTiming` data transition animations
+- **N React component instances** in the fiber tree
 
 While these `useAnimatedProps` mappers were primarily for data transitions (not gesture interaction), they still represent registered overhead in Reanimated's mapper system.
 
@@ -68,7 +68,7 @@ In v2, each candle was its own `CandlestickChartCandle` React component:
 ))}
 ```
 
-Each component called `useAnimatedProps` twice (for rect and line) and `React.useMemo` twice. Even though candles are static during gesture interaction, React's reconciler still visits each component during re-renders to determine if updates are needed.
+Each component called `useAnimatedProps` twice (for `AnimatedRect` and `AnimatedLine`) and `React.useMemo` twice (for static line/rect props). That's 4 hook calls per candle, scaling to 4N hooks for N candles. Even though candles are static during gesture interaction, React's reconciler still visits each component during re-renders to determine if updates are needed.
 
 ### Unguarded Shared Value Writes
 
@@ -97,7 +97,7 @@ In v2, each `PriceText` and `DatetimeText` component independently computed its 
 
 All chart rendering now uses `@shopify/react-native-skia`:
 
-- **Single Canvas** — all candles render into one GPU texture, not 200 native views
+- **Single Canvas** — all candles render into one GPU texture, not 2N native views
 - **SharedValue props** — Skia detects `SharedValue` objects passed as props and reads their `.value` at draw time on the UI thread, enabling smooth animations without React reconciliation
 - **`opaque` Canvas** — skips alpha compositing for the candlestick canvas, reducing GPU work
 
@@ -178,9 +178,9 @@ useAnimatedReaction(
 
 | Metric | v2 | v3 |
 |---|---|---|
-| Registered mappers (100 candles) | 200+ (per-candle `useAnimatedProps`) | **0** (pre-computed geometry) |
-| Native views (100 candles) | 200 SVG elements | **1 Canvas** |
-| React components (100 candles) | 100 `CandlestickChartCandle` | **0** (raw Skia elements) |
+| Registered mappers (N candles) | 2N (per-candle `useAnimatedProps`) | **0** (pre-computed geometry) |
+| Native views (N candles) | 2N SVG elements | **1 Canvas** |
+| React components (N candles) | N `CandlestickChartCandle` | **0** (raw Skia elements) |
 | Shared value writes per gesture frame | Unguarded (always writes) | **Guarded** (skips if unchanged) |
 | OHLC price computation | Per-consumer | **Shared** (1 `useDerivedValue` in context) |
 

@@ -220,7 +220,7 @@ Key reductions in v3:
 | Shared candle in context (was per-consumer `useDerivedValue`) | N-1 mappers |
 | Split crosshair/OHLC hooks | Prevents OHLC mappers from firing every frame |
 | Eliminated redundant `useDerivedValue` chain in line `useDatetime` | 1 mapper per DatetimeText |
-| Raw Skia elements instead of per-candle `useAnimatedProps` | 200 mappers for 100 candles |
+| Raw Skia elements instead of per-candle `useAnimatedProps` | 2N mappers (N = number of candles) |
 
 ---
 
