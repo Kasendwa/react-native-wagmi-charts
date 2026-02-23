@@ -125,21 +125,22 @@ export function LineChartPathWrapper({
 
   ////////////////////////////////////////////////
 
-  let backgroundChildren: React.ReactNode[] = [];
-  let foregroundChildren: React.ReactNode[] = [];
-  if (children) {
+  const { backgroundChildren, foregroundChildren } = React.useMemo(() => {
+    if (!children) return { backgroundChildren: [] as React.ReactNode[], foregroundChildren: [] as React.ReactNode[] };
     const iterableChildren = flattenChildren(children);
-    backgroundChildren = iterableChildren.filter((child) =>
-      BACKGROUND_COMPONENTS.includes(
-        (child as ReactElementWithDisplayName)?.type?.displayName || ''
-      )
-    );
-    foregroundChildren = iterableChildren.filter((child) =>
-      FOREGROUND_COMPONENTS.includes(
-        (child as ReactElementWithDisplayName)?.type?.displayName || ''
-      )
-    );
-  }
+    return {
+      backgroundChildren: iterableChildren.filter((child) =>
+        BACKGROUND_COMPONENTS.includes(
+          (child as ReactElementWithDisplayName)?.type?.displayName || ''
+        )
+      ),
+      foregroundChildren: iterableChildren.filter((child) =>
+        FOREGROUND_COMPONENTS.includes(
+          (child as ReactElementWithDisplayName)?.type?.displayName || ''
+        )
+      ),
+    };
+  }, [children]);
 
   ////////////////////////////////////////////////
   // Skia Canvas uses a separate reconciler, so React context doesn't propagate
@@ -147,15 +148,34 @@ export function LineChartPathWrapper({
   // renders its own <Canvas> internally, so it can read React context normally.
   // Foreground children receive the clip rect as a prop for clipping.
 
+  const isTransitionEnabled = pathProps.isTransitionEnabled ?? true;
+
+  const bgContextValue = React.useMemo(
+    () => ({ color, isInactive: showInactivePath, isTransitionEnabled }),
+    [color, showInactivePath, isTransitionEnabled]
+  );
+
+  const fgContextValue = React.useMemo(
+    () => ({ color, isInactive: false, isTransitionEnabled }),
+    [color, isTransitionEnabled]
+  );
+
+  const clippedForegroundChildren = React.useMemo(
+    () =>
+      foregroundChildren.map((child, i) =>
+        React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
+              key: i,
+              _foregroundClip: foregroundClip,
+            })
+          : child
+      ),
+    [foregroundChildren, foregroundClip]
+  );
+
   return (
     <>
-      <LineChartPathContext.Provider
-        value={{
-          color,
-          isInactive: showInactivePath,
-          isTransitionEnabled: pathProps.isTransitionEnabled ?? true,
-        }}
-      >
+      <LineChartPathContext.Provider value={bgContextValue}>
         <View style={viewSize}>
           <Canvas style={viewSize}>
             <LineChartPath
@@ -171,13 +191,7 @@ export function LineChartPathWrapper({
           {backgroundChildren}
         </View>
       </LineChartPathContext.Provider>
-      <LineChartPathContext.Provider
-        value={{
-          color,
-          isInactive: false,
-          isTransitionEnabled: pathProps.isTransitionEnabled ?? true,
-        }}
-      >
+      <LineChartPathContext.Provider value={fgContextValue}>
         <View style={StyleSheet.absoluteFill}>
           <Canvas style={viewSize}>
             <Group clip={foregroundClip}>
@@ -191,14 +205,7 @@ export function LineChartPathWrapper({
               />
             </Group>
           </Canvas>
-          {foregroundChildren.map((child, i) =>
-            React.isValidElement(child)
-              ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
-                  key: i,
-                  _foregroundClip: foregroundClip,
-                })
-              : child
-          )}
+          {clippedForegroundChildren}
         </View>
       </LineChartPathContext.Provider>
     </>

@@ -65,7 +65,7 @@ export const LineChartAxis = ({
     };
   }, [hideOnInteraction, isActive]);
 
-  const renderTicks = () => {
+  const { axisLine, ticks, labels } = React.useMemo(() => {
     const [min, max] = domain;
     const ticks = [];
     const labels = [];
@@ -230,12 +230,6 @@ export const LineChartAxis = ({
       }
     }
 
-    return { ticks, labels };
-  };
-
-  const renderAxis = () => {
-    const { ticks, labels } = renderTicks();
-
     let axisLine = null;
 
     if (strokeWidth) {
@@ -288,9 +282,7 @@ export const LineChartAxis = ({
     }
 
     return { axisLine, ticks, labels };
-  };
-
-  const { axisLine, ticks, labels } = renderAxis();
+  }, [domain, tickCount, orientation, position, width, height, effectiveHeight, color, strokeWidth, format, textStyle, labelPadding]);
 
   return (
     <Animated.View

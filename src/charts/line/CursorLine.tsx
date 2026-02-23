@@ -3,6 +3,7 @@ import { StyleSheet, type TextStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useDerivedValue,
+  useSharedValue,
 } from 'react-native-reanimated';
 import { Canvas, Line, DashPathEffect } from '@shopify/react-native-skia';
 
@@ -182,7 +183,7 @@ export function LineChartCursorLine({
     };
   });
 
-  const lineStart = useDerivedValue(() => ({ x: 0, y: 0 }));
+  const lineStart = useSharedValue({ x: 0, y: 0 });
 
   return (
     <LineChartCursor {...cursorProps} type="line">

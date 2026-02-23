@@ -39,20 +39,29 @@ export function LineChartGradient({
 
   ////////////////////////////////////////////////
 
-  const colors = customColors || [
-    `${color}26`, // ~15% opacity at 20%
-    `${color}0D`, // ~5% opacity at 40%
-    `${color}00`, // 0% opacity at 100%
-  ];
+  const colors = React.useMemo(
+    () => customColors || [
+      `${color}26`, // ~15% opacity at 20%
+      `${color}0D`, // ~5% opacity at 40%
+      `${color}00`, // 0% opacity at 100%
+    ],
+    [customColors, color]
+  );
 
-  const positions = customPositions || [0.2, 0.4, 1.0];
+  const positions = React.useMemo(
+    () => customPositions || [0.2, 0.4, 1.0],
+    [customPositions]
+  );
+
+  const start = React.useMemo(() => vec(0, 0), []);
+  const end = React.useMemo(() => vec(0, height), [height]);
 
   return (
     <Canvas style={StyleSheet.absoluteFill}>
       <SkiaPath path={animatedPath}>
         <LinearGradient
-          start={vec(0, 0)}
-          end={vec(0, height)}
+          start={start}
+          end={end}
           colors={colors}
           positions={positions}
         />

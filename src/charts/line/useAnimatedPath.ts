@@ -5,7 +5,7 @@ import {
 } from 'react-native-reanimated';
 import { Skia, usePathInterpolation } from '@shopify/react-native-skia';
 
-import { usePrevious } from '../../utils';
+const EMPTY_PATH = Skia.Path.Make();
 
 export function useAnimatedPath({
   enabled = true,
@@ -15,29 +15,25 @@ export function useAnimatedPath({
   path: string;
 }) {
   const transition = useSharedValue(0);
-  const previousPath = usePrevious(path);
+  // Keep a ref to the previous Skia path object to avoid re-parsing
+  const prevSkPathRef = React.useRef(EMPTY_PATH);
 
-  // Parse SVG path strings on the JS thread (not in a worklet)
+  // Parse SVG path string on the JS thread (not in a worklet)
   const currentSkPath = React.useMemo(
-    () => (path ? Skia.Path.MakeFromSVGString(path) : null) ?? Skia.Path.Make(),
+    () => (path ? Skia.Path.MakeFromSVGString(path) : null) ?? EMPTY_PATH,
     [path]
   );
 
-  const previousSkPath = React.useMemo(
-    () =>
-      previousPath
-        ? Skia.Path.MakeFromSVGString(previousPath) ?? currentSkPath
-        : currentSkPath,
-    [previousPath, currentSkPath]
-  );
+  // Capture previous Skia path object before it changes
+  const previousSkPath = prevSkPathRef.current;
 
   // Check if paths can be interpolated (same structure)
   const canInterpolate = React.useMemo(
-    () => enabled && previousSkPath.isInterpolatable(currentSkPath),
+    () => enabled && previousSkPath !== EMPTY_PATH && previousSkPath.isInterpolatable(currentSkPath),
     [enabled, previousSkPath, currentSkPath]
   );
 
-  // Trigger transition animation when path changes
+  // Trigger transition animation when path changes, then store current as previous
   React.useEffect(() => {
     if (canInterpolate) {
       transition.value = 0;
@@ -48,7 +44,9 @@ export function useAnimatedPath({
       transition.value = 0;
       transition.value = 1;
     }
-  }, [path, canInterpolate, transition]);
+    // Store current path for next transition (runs after render, like usePrevious)
+    prevSkPathRef.current = currentSkPath;
+  }, [path, canInterpolate, transition, currentSkPath]);
 
   // usePathInterpolation throws if paths aren't interpolatable,
   // so always feed it [currentSkPath, currentSkPath] when they differ in structure.
