@@ -15,33 +15,27 @@ export function useLineChartDatetime({
 } = {}) {
   const { currentIndex, data } = useLineChart();
 
-  const timestamp = useDerivedValue(() => {
+  const value = useDerivedValue(() => {
     if (
       !data ||
       typeof currentIndex.value === 'undefined' ||
       currentIndex.value === -1
     ) {
-      return '';
+      return -1;
     }
-    return data[currentIndex.value]?.timestamp ?? '';
+    return data[currentIndex.value]?.timestamp ?? -1;
   }, [currentIndex, data]);
 
-  const value = useDerivedValue(
-    () => new Date(timestamp.value).getTime(),
-    [timestamp]
-  );
-
   const formatted = useDerivedValue(() => {
-    const formattedDatetime = value.value
-      ? formatDatetime({
-          value: value.value,
-          locale,
-          options,
-        })
-      : '';
+    if (value.value === -1) return '';
+    const formattedDatetime = formatDatetime({
+      value: value.value,
+      locale,
+      options,
+    });
     return format
       ? format({
-          value: value.value || -1,
+          value: value.value,
           formatted: formattedDatetime,
         })
       : formattedDatetime;

@@ -113,8 +113,11 @@ export function LineChartCursor({
         // We have to run this on the JS thread unfortunately as the scaleLinear functions won't work on UI thread
         scheduleOnRN(linearScalePositionAndIndex, { xPosition });
       } else if (!snapToPoint) {
-        currentX.value = xPosition;
-        currentIndex.value = boundedIndex;
+        // Guard writes: Reanimated's _value setter fires all listeners
+        // unconditionally (no equality check), so skip writes when unchanged
+        // to avoid unnecessary mapper cascades.
+        if (currentX.value !== xPosition) currentX.value = xPosition;
+        if (currentIndex.value !== boundedIndex) currentIndex.value = boundedIndex;
       }
     }
   };
@@ -129,7 +132,7 @@ export function LineChartCursor({
           'worklet';
           if (parsedPath) {
             const xPosition = Math.max(0, event.x <= width ? event.x : width);
-            isActive.value = true;
+            if (!isActive.value) isActive.value = true;
             updatePosition(xPosition);
 
             if (onActivated) {
