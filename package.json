@@ -1,5 +1,5 @@
 {
-  "name": "react-native-wagmi-charts",
+  "name": "@kasendwa/react-native-skia-wagmi-charts",
   "version": "3.0.0-beta.1",
   "description": "A sweet candlestick chart for React Native",
   "main": "lib/commonjs/index.js",
@@ -36,9 +36,6 @@
     "react-native",
     "ios",
     "android"
-  ],
-  "workspaces": [
-    "example"
   ],
   "engines": {
     "node": ">= 18.0.0"

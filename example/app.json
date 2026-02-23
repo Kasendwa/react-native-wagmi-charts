@@ -17,5 +17,8 @@
   ],
   "plugins": [
     "expo-asset"
-  ]
+  ],
+  "android": {
+    "package": "com.ronaldkasendwa.reactnativewagmichartsexample"
+  }
 }
