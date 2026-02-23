@@ -60,7 +60,7 @@ export function LineChartCursor({
     return scaleLinear().domain(domainArray).range([0, width]);
   }, [width, xDomain, xValues.length]);
 
-  const linearScalePositionAndIndex = ({
+  const linearScalePositionAndIndex = React.useCallback(({
     xPosition,
   }: {
     xPosition: number;
@@ -87,7 +87,7 @@ export function LineChartCursor({
     // Update values
     currentIndex.value = closestIndex;
     currentX.value = newXPosition;
-  };
+  }, [parsedPath, scaleX, xValues, currentIndex, currentX]);
 
   useEffect(() => {
     if (at !== undefined) {
@@ -119,52 +119,58 @@ export function LineChartCursor({
     }
   };
 
-  const longPressGesture = Gesture.LongPress()
-    .minDuration(minDurationMs ?? 0)
-    .maxDistance(999999)
-    .shouldCancelWhenOutside(shouldCancelWhenOutside)
-    .onStart(
-      (event: GestureStateChangeEvent<LongPressGestureHandlerEventPayload>) => {
-        'worklet';
-        if (parsedPath) {
-          const xPosition = Math.max(0, event.x <= width ? event.x : width);
-          isActive.value = true;
-          updatePosition(xPosition);
+  const longPressGesture = React.useMemo(() =>
+    Gesture.LongPress()
+      .minDuration(minDurationMs ?? 0)
+      .maxDistance(999999)
+      .shouldCancelWhenOutside(shouldCancelWhenOutside)
+      .onStart(
+        (event: GestureStateChangeEvent<LongPressGestureHandlerEventPayload>) => {
+          'worklet';
+          if (parsedPath) {
+            const xPosition = Math.max(0, event.x <= width ? event.x : width);
+            isActive.value = true;
+            updatePosition(xPosition);
 
-          if (onActivated) {
-            scheduleOnRN(onActivated);
+            if (onActivated) {
+              scheduleOnRN(onActivated);
+            }
           }
         }
-      }
-    )
-    .onTouchesMove((event) => {
-      'worklet';
-      if (
-        parsedPath &&
-        isActive.value &&
-        event.allTouches.length > 0 &&
-        event.allTouches[0]
-      ) {
-        const touchX = event.allTouches[0].x;
-        const xPosition = Math.max(0, touchX <= width ? touchX : width);
-        updatePosition(xPosition);
-      }
-    })
-    .onEnd(() => {
-      'worklet';
+      )
+      .onTouchesMove((event) => {
+        'worklet';
+        if (
+          parsedPath &&
+          isActive.value &&
+          event.allTouches.length > 0 &&
+          event.allTouches[0]
+        ) {
+          const touchX = event.allTouches[0].x;
+          const xPosition = Math.max(0, touchX <= width ? touchX : width);
+          updatePosition(xPosition);
+        }
+      })
+      .onEnd(() => {
+        'worklet';
 
-      if (!persistOnEnd) {
-        isActive.value = false;
-        currentIndex.value = -1;
-      }
+        if (!persistOnEnd) {
+          isActive.value = false;
+          currentIndex.value = -1;
+        }
 
-      if (onEnded) {
-        scheduleOnRN(onEnded);
-      }
-    });
+        if (onEnded) {
+          scheduleOnRN(onEnded);
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [minDurationMs, shouldCancelWhenOutside, parsedPath, width, persistOnEnd, onActivated, onEnded]
+  );
+
+  const cursorContextValue = React.useMemo(() => ({ type }), [type]);
 
   return (
-    <CursorContext.Provider value={{ type }}>
+    <CursorContext.Provider value={cursorContextValue}>
       <GestureDetector gesture={longPressGesture}>
         <Animated.View style={StyleSheet.absoluteFill}>
           {children}

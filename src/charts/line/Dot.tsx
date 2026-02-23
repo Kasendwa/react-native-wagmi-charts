@@ -1,5 +1,4 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
 
 import {
   Easing,
@@ -9,13 +8,11 @@ import {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { Canvas, Circle, Group, type CircleProps } from '@shopify/react-native-skia';
+import { Circle, Group, type CircleProps } from '@shopify/react-native-skia';
 
-import { LineChartDimensionsContext } from './Chart';
-import { LineChartPathContext } from './LineChartPathContext';
 import { getXPositionForCurve } from './utils/getXPositionForCurve';
 import { getYForX } from 'react-native-redash';
-import { useLineChart } from './useLineChart';
+import type { Path } from 'react-native-redash';
 
 export type LineChartDotProps = {
   /** Additional props for the inner dot Circle */
@@ -44,6 +41,12 @@ export type LineChartDotProps = {
    */
   outerSize?: number;
   pulseDurationMs?: number;
+  /** @internal Injected by ChartPath */
+  _parsedPath?: Path;
+  /** @internal Injected by ChartPath */
+  _isInactive?: boolean;
+  /** @internal Injected by ChartPath */
+  _isActive?: SharedValue<boolean>;
 };
 
 LineChartDot.displayName = 'LineChartDot';
@@ -62,13 +65,13 @@ export function LineChartDot({
   size = 4,
   outerSize = size * 4,
   _foregroundClip,
+  _parsedPath: parsedPath,
+  _isInactive = false,
+  _isActive: isActive = { value: false } as SharedValue<boolean>,
 }: LineChartDotProps) {
-  const { isActive } = useLineChart();
-  const { parsedPath } = React.useContext(LineChartDimensionsContext);
 
   ////////////////////////////////////////////////////////////
 
-  const { isInactive: _isInactive } = React.useContext(LineChartPathContext);
   const isInactive = showInactiveColor && _isInactive;
   const color = isInactive ? inactiveColor || defaultColor : defaultColor;
   const opacity = isInactive && !inactiveColor ? 0.5 : 1;
@@ -77,13 +80,14 @@ export function LineChartDot({
   ////////////////////////////////////////////////////////////
 
   const cx = useDerivedValue(() => {
+    if (!parsedPath) return 0;
     return withTiming(getXPositionForCurve(parsedPath, at));
   }, [at, parsedPath]);
 
-  const cy = useDerivedValue(
-    () => withTiming(getYForX(parsedPath!, cx.value) || 0),
-    [parsedPath, cx]
-  );
+  const cy = useDerivedValue(() => {
+    if (!parsedPath) return 0;
+    return withTiming(getYForX(parsedPath, cx.value) || 0);
+  }, [parsedPath, cx]);
 
   ////////////////////////////////////////////////////////////
 
@@ -170,9 +174,5 @@ export function LineChartDot({
     </>
   );
 
-  return (
-    <Canvas style={StyleSheet.absoluteFill}>
-      {_foregroundClip ? <Group clip={_foregroundClip}>{content}</Group> : content}
-    </Canvas>
-  );
+  return _foregroundClip ? <Group clip={_foregroundClip}>{content}</Group> : content;
 }

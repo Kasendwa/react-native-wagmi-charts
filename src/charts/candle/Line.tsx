@@ -11,7 +11,9 @@ export type CandlestickChartLineProps = {
   dashGap?: number;
 };
 
-export const CandlestickChartLine = ({
+const ORIGIN = vec(0, 0);
+
+export const CandlestickChartLine = React.memo(({
   color = 'gray',
   x,
   y,
@@ -19,17 +21,20 @@ export const CandlestickChartLine = ({
   dashWidth = 6,
   dashGap = 6,
 }: CandlestickChartLineProps) => {
+  const p2 = React.useMemo(() => vec(x, y), [x, y]);
+  const intervals = React.useMemo(() => [dashWidth, dashGap], [dashWidth, dashGap]);
+
   return (
     <Canvas style={StyleSheet.absoluteFill}>
       <Line
-        p1={vec(0, 0)}
-        p2={vec(x, y)}
+        p1={ORIGIN}
+        p2={p2}
         strokeWidth={strokeWidth}
         color={color}
         style="stroke"
       >
-        <DashPathEffect intervals={[dashWidth, dashGap]} />
+        <DashPathEffect intervals={intervals} />
       </Line>
     </Canvas>
   );
-};
+});

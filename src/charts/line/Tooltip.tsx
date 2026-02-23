@@ -15,6 +15,7 @@ import { LineChartDimensionsContext } from './Chart';
 import type { LayoutChangeEvent, ViewProps } from 'react-native';
 import { getXPositionForCurve } from './utils/getXPositionForCurve';
 import { getYForX } from 'react-native-redash';
+import { useCurrentY } from './useCurrentY';
 import { useLineChart } from './useLineChart';
 import { useMemo } from 'react';
 import type { TFormatterFn } from '../../types';
@@ -60,7 +61,8 @@ export function LineChartTooltip({
     LineChartDimensionsContext
   );
   const { type } = React.useContext(CursorContext);
-  const { currentX, currentY, isActive } = useLineChart();
+  const { currentX, isActive } = useLineChart();
+  const currentY = useCurrentY();
 
   const elementWidth = useSharedValue(0);
   const elementHeight = useSharedValue(0);
@@ -103,48 +105,38 @@ export function LineChartTooltip({
    * and boundary constraints
    */
   const calculateXTranslateOffset = React.useCallback(
-    (params: {
-      position: LineChartTooltipPosition;
-      x: number;
-      elementWidth: number;
-      width: number;
-      xGutter: number;
-      cursorGutter: number;
-      withHorizontalFloating: boolean;
-    }) => {
+    (
+      _position: LineChartTooltipPosition,
+      x: number,
+      _elementWidth: number,
+      _width: number,
+      _xGutter: number,
+      _cursorGutter: number,
+      _withHorizontalFloating: boolean,
+    ) => {
       'worklet';
-      const {
-        position,
-        x,
-        elementWidth,
-        width,
-        xGutter,
-        cursorGutter,
-        withHorizontalFloating,
-      } = params;
+      let translateXOffset = getInitialTranslateXOffset(_elementWidth);
+      const elementFullWidth = _elementWidth + _xGutter + _cursorGutter;
 
-      let translateXOffset = getInitialTranslateXOffset(elementWidth);
-      const elementFullWidth = elementWidth + xGutter + cursorGutter;
-
-      if (position === 'right') {
+      if (_position === 'right') {
         if (x < elementFullWidth) {
-          translateXOffset = withHorizontalFloating
-            ? -cursorGutter
+          translateXOffset = _withHorizontalFloating
+            ? -_cursorGutter
             : translateXOffset - elementFullWidth + x;
         }
-      } else if (position === 'left') {
-        if (x > width - elementFullWidth) {
-          translateXOffset = withHorizontalFloating
-            ? elementWidth + cursorGutter
-            : translateXOffset + (x - (width - elementFullWidth));
+      } else if (_position === 'left') {
+        if (x > _width - elementFullWidth) {
+          translateXOffset = _withHorizontalFloating
+            ? _elementWidth + _cursorGutter
+            : translateXOffset + (x - (_width - elementFullWidth));
         }
       } else {
         // Center position
-        if (x < elementWidth / 2 + xGutter) {
-          translateXOffset -= elementWidth / 2 + xGutter - x;
+        if (x < _elementWidth / 2 + _xGutter) {
+          translateXOffset -= _elementWidth / 2 + _xGutter - x;
         }
-        if (x > width - elementWidth / 2 - xGutter) {
-          translateXOffset += x - (width - elementWidth / 2 - xGutter);
+        if (x > _width - _elementWidth / 2 - _xGutter) {
+          translateXOffset += x - (_width - _elementWidth / 2 - _xGutter);
         }
       }
 
@@ -158,31 +150,29 @@ export function LineChartTooltip({
    * boundary constraints
    */
   const calculateYTranslateOffset = React.useCallback(
-    (params: {
-      position: LineChartTooltipPosition;
-      y: number;
-      elementHeight: number;
-      height: number;
-      yGutter: number;
-      cursorGutter: number;
-    }) => {
+    (
+      _position: LineChartTooltipPosition,
+      y: number,
+      _elementHeight: number,
+      _height: number,
+      _yGutter: number,
+      _cursorGutter: number,
+    ) => {
       'worklet';
-      const { position, y, elementHeight, height, yGutter, cursorGutter } =
-        params;
       let translateYOffset = 0;
 
-      if (position === 'top') {
-        translateYOffset = elementHeight / 2 + cursorGutter;
-        if (y - translateYOffset < yGutter) {
-          translateYOffset = y - yGutter;
+      if (_position === 'top') {
+        translateYOffset = _elementHeight / 2 + _cursorGutter;
+        if (y - translateYOffset < _yGutter) {
+          translateYOffset = y - _yGutter;
         }
-      } else if (position === 'bottom') {
-        translateYOffset = -(elementHeight / 2) - cursorGutter / 2;
-        if (y - translateYOffset + elementHeight > height - yGutter) {
-          translateYOffset = y - (height - yGutter) + elementHeight;
+      } else if (_position === 'bottom') {
+        translateYOffset = -(_elementHeight / 2) - _cursorGutter / 2;
+        if (y - translateYOffset + _elementHeight > _height - _yGutter) {
+          translateYOffset = y - (_height - _yGutter) + _elementHeight;
         }
-      } else if (position === 'right' || position === 'left') {
-        translateYOffset = elementHeight / 2;
+      } else if (_position === 'right' || _position === 'left') {
+        translateYOffset = _elementHeight / 2;
       }
 
       return translateYOffset;
@@ -196,27 +186,16 @@ export function LineChartTooltip({
 
     // Calculate X position:
     const x = atXPosition ?? currentX.value;
-    const translateXOffset = calculateXTranslateOffset({
-      position,
-      x,
-      elementWidth: elementWidth.value,
-      width,
-      xGutter,
-      cursorGutter,
-      withHorizontalFloating,
-    });
+    const translateXOffset = calculateXTranslateOffset(
+      position, x, elementWidth.value, width, xGutter, cursorGutter, withHorizontalFloating,
+    );
     const translateX = x - translateXOffset;
 
     // Calculate Y position:
     const y = atYPosition.value ?? currentY.value;
-    const translateYOffset = calculateYTranslateOffset({
-      position,
-      y,
-      elementHeight: elementHeight.value,
-      height,
-      yGutter,
-      cursorGutter,
-    });
+    const translateYOffset = calculateYTranslateOffset(
+      position, y, elementHeight.value, height, yGutter, cursorGutter,
+    );
 
     // Determine final translateY value
     let translateY: number;

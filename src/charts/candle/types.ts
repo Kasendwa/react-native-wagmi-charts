@@ -14,6 +14,8 @@ export type TContext = {
   currentX: SharedValue<number>;
   currentY: SharedValue<number>;
   currentIndex: SharedValue<number>;
+  /** The current candle under the crosshair, computed once in the provider */
+  candle: Readonly<SharedValue<TCandle>>;
   data: TData;
   width: number;
   height: number;

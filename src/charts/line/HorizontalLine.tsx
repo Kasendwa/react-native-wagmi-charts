@@ -2,14 +2,13 @@ import {
   useDerivedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { StyleSheet } from 'react-native';
-import { Canvas, Line, DashPathEffect } from '@shopify/react-native-skia';
+import { Line, DashPathEffect } from '@shopify/react-native-skia';
 
-import { LineChartDimensionsContext } from './Chart';
 import React from 'react';
 import { getXPositionForCurve } from './utils/getXPositionForCurve';
 import { getYForX } from 'react-native-redash';
-import { useLineChart } from './useLineChart';
+import type { Path } from 'react-native-redash';
+import type { YDomain } from './types';
 
 type HorizontalLineProps = {
   color?: string;
@@ -40,6 +39,16 @@ type HorizontalLineProps = {
         value: number;
       }
     | number;
+  /** @internal Injected by ChartPath */
+  _width?: number;
+  /** @internal Injected by ChartPath */
+  _parsedPath?: Path;
+  /** @internal Injected by ChartPath */
+  _height?: number;
+  /** @internal Injected by ChartPath */
+  _gutter?: number;
+  /** @internal Injected by ChartPath */
+  _yDomain?: YDomain;
 };
 
 LineChartHorizontalLine.displayName = 'LineChartHorizontalLine';
@@ -51,17 +60,19 @@ export function LineChartHorizontalLine({
   dashGap = 3,
   at = { index: 0 },
   offsetY = 0,
+  _width: width = 0,
+  _parsedPath: parsedPath,
+  _height: height = 0,
+  _gutter: gutter = 0,
+  _yDomain: yDomain = { min: 0, max: 0 },
 }: HorizontalLineProps) {
-  const { width, parsedPath, height, gutter } = React.useContext(
-    LineChartDimensionsContext
-  );
-  const { yDomain } = useLineChart();
 
   const y = useDerivedValue(() => {
+    if (!parsedPath) return 0;
     if (typeof at === 'number' || at.index != null) {
       const index = typeof at === 'number' ? at : at.index;
       const yForX =
-        getYForX(parsedPath!, getXPositionForCurve(parsedPath, index)) || 0;
+        getYForX(parsedPath, getXPositionForCurve(parsedPath, index)) || 0;
       return withTiming(yForX + offsetY);
     }
     /**
@@ -86,16 +97,14 @@ export function LineChartHorizontalLine({
   const p2 = useDerivedValue(() => ({ x: width, y: y.value }), [y, width]);
 
   return (
-    <Canvas style={StyleSheet.absoluteFill}>
-      <Line
-        p1={p1}
-        p2={p2}
-        strokeWidth={strokeWidth}
-        color={color}
-        style="stroke"
-      >
-        <DashPathEffect intervals={[dashWidth, dashGap]} />
-      </Line>
-    </Canvas>
+    <Line
+      p1={p1}
+      p2={p2}
+      strokeWidth={strokeWidth}
+      color={color}
+      style="stroke"
+    >
+      <DashPathEffect intervals={[dashWidth, dashGap]} />
+    </Line>
   );
 }

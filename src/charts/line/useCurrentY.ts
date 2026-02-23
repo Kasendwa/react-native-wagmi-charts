@@ -1,13 +1,12 @@
-import { useContext, useMemo } from 'react';
+import { useContext } from 'react';
 import { useDerivedValue } from 'react-native-reanimated';
-import { getYForX, parse } from 'react-native-redash';
+import { getYForX } from 'react-native-redash';
 import { LineChartContext } from './Context';
 import { LineChartDimensionsContext } from './Chart';
 
 export function useCurrentY() {
-  const { path, width } = useContext(LineChartDimensionsContext);
+  const { parsedPath, width } = useContext(LineChartDimensionsContext);
   const { currentX } = useContext(LineChartContext);
-  const parsedPath = useMemo(() => (path ? parse(path) : undefined), [path]);
 
   const currentY = useDerivedValue(() => {
     if (!parsedPath) {

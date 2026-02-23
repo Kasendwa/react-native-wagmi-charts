@@ -1,8 +1,5 @@
 import * as React from 'react';
-import { StyleSheet } from 'react-native';
-import { Canvas, Path as SkiaPath, LinearGradient, vec } from '@shopify/react-native-skia';
-import { LineChartDimensionsContext } from './Chart';
-import { LineChartPathContext } from './LineChartPathContext';
+import { Path as SkiaPath, LinearGradient, vec } from '@shopify/react-native-skia';
 import { useAnimatedPath } from './useAnimatedPath';
 
 export type LineChartGradientProps = {
@@ -16,6 +13,14 @@ export type LineChartGradientProps = {
    * Gradient stop positions (0 to 1). Must match the length of `colors`.
    */
   positions?: number[];
+  /** @internal Injected by ChartPath */
+  _area?: string;
+  /** @internal Injected by ChartPath */
+  _height?: number;
+  /** @internal Injected by ChartPath */
+  _color?: string;
+  /** @internal Injected by ChartPath */
+  _isTransitionEnabled?: boolean;
 };
 
 LineChartGradient.displayName = 'LineChartGradient';
@@ -24,10 +29,11 @@ export function LineChartGradient({
   color: overrideColor = undefined,
   colors: customColors,
   positions: customPositions,
+  _area: area = '',
+  _height: height = 0,
+  _color: contextColor = 'black',
+  _isTransitionEnabled: isTransitionEnabled = true,
 }: LineChartGradientProps) {
-  const { area, height } = React.useContext(LineChartDimensionsContext);
-  const { color: contextColor, isTransitionEnabled } =
-    React.useContext(LineChartPathContext);
   const color = overrideColor || contextColor;
 
   ////////////////////////////////////////////////
@@ -57,15 +63,13 @@ export function LineChartGradient({
   const end = React.useMemo(() => vec(0, height), [height]);
 
   return (
-    <Canvas style={StyleSheet.absoluteFill}>
-      <SkiaPath path={animatedPath}>
-        <LinearGradient
-          start={start}
-          end={end}
-          colors={colors}
-          positions={positions}
-        />
-      </SkiaPath>
-    </Canvas>
+    <SkiaPath path={animatedPath}>
+      <LinearGradient
+        start={start}
+        end={end}
+        colors={colors}
+        positions={positions}
+      />
+    </SkiaPath>
   );
 }

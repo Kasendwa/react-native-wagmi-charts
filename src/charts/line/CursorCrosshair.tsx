@@ -7,6 +7,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { LineChartCursor, LineChartCursorProps } from './Cursor';
+import { useCurrentY } from './useCurrentY';
 import { useLineChart } from './useLineChart';
 
 /**
@@ -41,7 +42,8 @@ export function LineChartCursorCrosshair({
   crosshairOuterProps = {},
   ...props
 }: LineChartCursorCrosshairProps) {
-  const { currentX, currentY, isActive } = useLineChart();
+  const { currentX, isActive } = useLineChart();
+  const currentY = useCurrentY();
 
   // It seems that enabling spring animation on initial render on Android causes a crash.
   const [enableSpringAnimation, setEnableSpringAnimation] = React.useState(

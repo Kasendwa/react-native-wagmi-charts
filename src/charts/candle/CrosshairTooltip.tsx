@@ -8,7 +8,6 @@ import type {
 import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
 } from 'react-native-reanimated';
 import type { SharedValue, AnimatedStyle } from 'react-native-reanimated';
@@ -63,72 +62,53 @@ export function CandlestickChartCrosshairTooltip({
     [elementHeight, elementWidth]
   );
 
-  const topOffset = useDerivedValue(() => {
-    let offset = 0;
-    if (currentY.value < elementHeight.value / 2 + yGutter) {
-      offset = currentY.value - (elementHeight.value / 2 + yGutter);
-    } else if (currentY.value + elementHeight.value / 2 > height - yGutter) {
-      offset = currentY.value + elementHeight.value / 2 - height + yGutter;
-    }
+  // Single tooltip that repositions based on crosshair position.
+  // Previously rendered 2 tooltips (left + right) and hid one with opacity,
+  // which doubled the worklet count (2× useAnimatedStyle + 2× PriceText).
+  const tooltipStyle = useAnimatedStyle(
+    () => {
+      const left = position.value === 'left'
+        ? xGutter
+        : width - elementWidth.value - xGutter;
 
-    return offset;
-  }, [currentY, elementHeight, height, yGutter]);
+      let topOffset = 0;
+      if (currentY.value < elementHeight.value / 2 + yGutter) {
+        topOffset = currentY.value - (elementHeight.value / 2 + yGutter);
+      } else if (currentY.value + elementHeight.value / 2 > height - yGutter) {
+        topOffset = currentY.value + elementHeight.value / 2 - height + yGutter;
+      }
 
-  const tooltip = useAnimatedStyle(
-    () => ({
-      backgroundColor: 'white',
-      position: 'absolute',
-      display: 'flex',
-      padding: 4,
-    }),
-    []
-  );
-
-  const leftTooltip = useAnimatedStyle(
-    () => ({
-      left: xGutter,
-      top: -(elementHeight.value / 2) - topOffset.value,
-      opacity: position.value === 'left' ? 1 : 0,
-    }),
-    [elementHeight, position, topOffset, xGutter]
-  );
-
-  const rightTooltip = useAnimatedStyle(
-    () => ({
-      left: width - elementWidth.value - xGutter,
-      top: -(elementHeight.value / 2) - topOffset.value,
-      opacity: position.value === 'right' ? 1 : 0,
-    }),
-    [elementHeight, elementWidth, position, topOffset, width, xGutter]
+      return {
+        left,
+        top: -(elementHeight.value / 2) - topOffset,
+      };
+    },
+    [currentY, elementHeight, elementWidth, height, position, width, xGutter, yGutter]
   );
 
   return (
-    <>
-      <Animated.View
-        onLayout={handleLayout}
-        {...props}
-        style={[tooltip, leftTooltip, props.style]}
-      >
-        {children || (
-          <CandlestickChartPriceText
-            {...tooltipTextProps}
-            style={[styles.text, tooltipTextProps?.style, textStyle]}
-          />
-        )}
-      </Animated.View>
-      <Animated.View {...props} style={[tooltip, rightTooltip, props.style]}>
-        {children || (
-          <CandlestickChartPriceText
-            {...tooltipTextProps}
-            style={[styles.text, tooltipTextProps?.style, textStyle]}
-          />
-        )}
-      </Animated.View>
-    </>
+    <Animated.View
+      onLayout={handleLayout}
+      {...props}
+      style={[styles.tooltip, tooltipStyle, props.style]}
+    >
+      {children || (
+        <CandlestickChartPriceText
+          {...tooltipTextProps}
+          style={[styles.text, tooltipTextProps?.style, textStyle]}
+        />
+      )}
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  tooltip: {
+    backgroundColor: 'white',
+    position: 'absolute',
+    display: 'flex',
+    padding: 4,
+  },
   text: {
     fontSize: 14,
   },

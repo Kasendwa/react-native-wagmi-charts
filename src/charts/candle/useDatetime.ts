@@ -19,28 +19,26 @@ export function useCandlestickChartDatetime({
 } {
   const candle = useCandleData();
 
-  const timestamp = useDerivedValue(() => {
-    return candle.value.timestamp;
-  });
-
   const timestampString = useDerivedValue(() => {
-    if (timestamp.value === -1) return '';
-    return timestamp.value.toString();
-  }, [timestamp]);
+    const ts = candle.value.timestamp;
+    if (ts === -1) return '';
+    return ts.toString();
+  }, [candle]);
 
   const formatted = useDerivedValue(() => {
-    if (timestamp.value === -1) return '';
+    const ts = candle.value.timestamp;
+    if (ts === -1) return '';
 
     const formattedDatetime = formatDatetime({
-      value: timestamp.value,
+      value: ts,
       locale,
       options,
     });
 
     return format
-      ? format({ value: timestamp.value, formatted: formattedDatetime })
+      ? format({ value: ts, formatted: formattedDatetime })
       : formattedDatetime;
-  }, [timestamp, locale, options, format]);
+  }, [candle, locale, options, format]);
 
   return { value: timestampString, formatted };
 }

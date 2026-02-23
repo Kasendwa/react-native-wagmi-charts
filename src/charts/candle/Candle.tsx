@@ -42,7 +42,7 @@ export type CandlestickChartCandleProps = {
   }) => React.ReactNode;
 };
 
-export const CandlestickChartCandle = ({
+export const CandlestickChartCandle = React.memo(({
   candle,
   maxHeight,
   domain,
@@ -64,11 +64,11 @@ export const CandlestickChartCandle = ({
 
   // Target values
   const targetLineX = x + width / 2;
-  const targetLowY = getY({ maxHeight, value: low, domain });
-  const targetHighY = getY({ maxHeight, value: high, domain });
+  const targetLowY = getY(maxHeight, low, domain);
+  const targetHighY = getY(maxHeight, high, domain);
   const targetRectX = x + margin;
-  const targetRectY = getY({ maxHeight, value: max, domain });
-  const targetRectH = getHeight({ maxHeight, value: max - min, domain });
+  const targetRectY = getY(maxHeight, max, domain);
+  const targetRectH = getHeight(maxHeight, max - min, domain);
 
   // Animated shared values
   const lineX = useSharedValue(targetLineX);
@@ -147,4 +147,4 @@ export const CandlestickChartCandle = ({
       <Rect x={animRectX} y={animRectY} width={width - margin * 2} height={animRectH} color={fill} />
     </>
   );
-};
+});

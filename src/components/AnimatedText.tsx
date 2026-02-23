@@ -17,14 +17,33 @@ interface AnimatedTextProps {
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
-export const AnimatedText = ({ text, style }: AnimatedTextProps) => {
+export const AnimatedText = Platform.OS === 'web' ? AnimatedTextWeb : AnimatedTextNative;
+
+function AnimatedTextNative({ text, style }: AnimatedTextProps) {
+  const animatedProps = useAnimatedProps(() => {
+    return {
+      text: text.value,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  });
+
+  return (
+    <AnimatedTextInput
+      underlineColorAndroid="transparent"
+      editable={false}
+      style={[styles.text, style]}
+      animatedProps={animatedProps}
+    />
+  );
+}
+
+function AnimatedTextWeb({ text, style }: AnimatedTextProps) {
   const inputRef = React.useRef<TextInput>(null);
 
   useAnimatedReaction(
     () => text.value,
     (data, prevData) => {
-      // Only execute for web platform
-      if (Platform.OS === 'web' && data !== prevData && inputRef.current) {
+      if (data !== prevData && inputRef.current) {
         // @ts-expect-error - web TextInput has value property
         inputRef.current.value = data;
       }
@@ -43,12 +62,12 @@ export const AnimatedText = ({ text, style }: AnimatedTextProps) => {
     <AnimatedTextInput
       underlineColorAndroid="transparent"
       editable={false}
-      ref={Platform.select({ web: inputRef })}
+      ref={inputRef}
       style={[styles.text, style]}
       animatedProps={animatedProps}
     />
   );
-};
+}
 
 const styles = StyleSheet.create({
   text: {

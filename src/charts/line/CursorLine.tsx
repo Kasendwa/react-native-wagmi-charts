@@ -11,6 +11,7 @@ import type { TFormatterFn } from '../../types';
 import { AnimatedText } from '../../components/AnimatedText';
 import { LineChartDimensionsContext } from './Chart';
 import { LineChartCursor, type LineChartCursorProps } from './Cursor';
+import { useCurrentY } from './useCurrentY';
 import { useLineChartDatetime } from './useDatetime';
 import { useLineChart } from './useLineChart';
 import { useLineChartPrice } from './usePrice';
@@ -57,7 +58,8 @@ export function LineChartCursorLine({
 }: LineChartCursorLineProps) {
   const isHorizontal = cursorProps?.orientation === 'horizontal';
   const { height, width } = React.useContext(LineChartDimensionsContext);
-  const { currentX, currentY, isActive } = useLineChart();
+  const { currentX, isActive } = useLineChart();
+  const currentY = useCurrentY();
 
   const price = useLineChartPrice({
     format: isHorizontal ? (format as TFormatterFn<string>) : undefined,
@@ -113,36 +115,42 @@ export function LineChartCursorLine({
       : [{ translateX: currentX.value }],
   }));
 
-  const calculateFontSizeAdjustment = (fontSize: number) => {
-    'worklet';
-    return Math.max(0.6, Math.min(0.8, 0.7 + (fontSize - 12) * 0.01));
-  };
+  // Pre-compute all static style properties outside the worklet
+  const fontSize = textStyle?.fontSize || TEXT_CONSTANTS.DEFAULT_FONT_SIZE;
+  const lineHeight = textStyle?.lineHeight || fontSize * 1.2;
+  const textColor = textStyle?.color || TEXT_CONSTANTS.DEFAULT_COLOR;
 
-  const textPositionStyle = useAnimatedStyle(() => {
-    const fontSize = textStyle?.fontSize || TEXT_CONSTANTS.DEFAULT_FONT_SIZE;
-    const lineHeight = textStyle?.lineHeight || fontSize * 1.2;
-
-    const baseStyle = {
+  const staticBaseStyle = React.useMemo(
+    () => ({
       position: 'absolute' as const,
-      width: textWidth.value,
       fontSize,
       lineHeight,
-      color: textStyle?.color || TEXT_CONSTANTS.DEFAULT_COLOR,
+      color: textColor,
       ...textStyle,
-    };
+    }),
+    [fontSize, lineHeight, textColor, textStyle]
+  );
 
+  // Pre-compute static values for horizontal layout
+  const horizontalTextCenterOffset = React.useMemo(() => {
+    const fontSizeAdjustment = Math.max(0.6, Math.min(0.8, 0.7 + (fontSize - 12) * 0.01));
+    return -(lineHeight * fontSizeAdjustment);
+  }, [fontSize, lineHeight]);
+
+  // Pre-compute static value for vertical layout
+  const verticalLabelTop = height - SPACING.X_AXIS_LABEL_RESERVED_HEIGHT + SPACING.HORIZONTAL_TEXT_MARGIN;
+
+  const textPositionStyle = useAnimatedStyle(() => {
     if (isHorizontal) {
-      const fontSizeAdjustment = calculateFontSizeAdjustment(fontSize);
-      const textCenterOffset = -(lineHeight * fontSizeAdjustment);
-
       return {
-        ...baseStyle,
+        ...staticBaseStyle,
+        width: textWidth.value,
         left:
           width -
           textWidth.value -
           SPACING.HORIZONTAL_RIGHT_MARGIN +
           TEXT_CONSTANTS.INPUT_PADDING,
-        top: textCenterOffset,
+        top: horizontalTextCenterOffset,
         textAlign: 'right' as const,
         paddingLeft: 0,
         paddingRight: 0,
@@ -151,34 +159,21 @@ export function LineChartCursorLine({
 
     // For vertical cursor (x-axis label)
     const halfTextWidth = textWidth.value / 2;
-
-    // Since the container is already translated by currentX, we need to calculate
-    // the label position relative to the container's position
     const containerX = currentX.value;
 
-    // Calculate where the label would be if centered
     let labelLeft = -halfTextWidth;
-
-    // Check if label would overflow on the left
     if (containerX + labelLeft < 0) {
       labelLeft = -containerX;
     }
-
-    // Check if label would overflow on the right
     if (containerX + labelLeft + textWidth.value > width) {
       labelLeft = width - containerX - textWidth.value;
     }
 
-    // Position label in the reserved space at the bottom
-    const labelTop =
-      height -
-      SPACING.X_AXIS_LABEL_RESERVED_HEIGHT +
-      SPACING.HORIZONTAL_TEXT_MARGIN;
-
     return {
-      ...baseStyle,
+      ...staticBaseStyle,
+      width: textWidth.value,
       left: labelLeft,
-      top: labelTop,
+      top: verticalLabelTop,
       textAlign: 'center' as const,
     };
   });
