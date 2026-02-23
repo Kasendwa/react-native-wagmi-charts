@@ -99,10 +99,24 @@ WAGMI charts also depends on a few libraries, you will also need to install
 these packages if you don't already have them:
 
 ```bash
-npm install @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets react-native-haptic-feedback
+npm install @shopify/react-native-skia react-native-reanimated react-native-gesture-handler react-native-worklets
 ```
 
 > **Note:** v3 uses `@shopify/react-native-skia` for rendering instead of `react-native-svg`. If you are upgrading from v2, see the [Migration Guide](#migrating-from-v2-to-v3) below.
+
+### Compatibility
+
+Minimum supported versions (driven primarily by `react-native-reanimated` v4 and `@shopify/react-native-skia`):
+
+| Dependency | Minimum Version |
+|---|---|
+| React | 19.0 |
+| React Native | 0.78 |
+| react-native-reanimated | 4.0.0 |
+| react-native-worklets | 0.7.0 |
+| @shopify/react-native-skia | 2.0.0 |
+| react-native-gesture-handler | 2.x |
+| Node.js | 18.0 |
 
 ## Basic Usage
 
